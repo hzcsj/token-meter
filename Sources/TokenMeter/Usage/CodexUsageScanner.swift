@@ -23,7 +23,7 @@ struct CodexFileScanResult: Codable {
 
 struct CodexUsageScanner {
     private let codexDir: URL
-    private let cache = IncrementalCache<CodexFileScanResult>(name: "codex_usage_v3")
+    private let cache = IncrementalCache<CodexFileScanResult>(name: "codex_usage")
 
     init() {
         let home = FileManager.default.homeDirectoryForCurrentUser

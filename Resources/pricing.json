@@ -1,0 +1,46 @@
+{
+  "_meta": {
+    "usd_to_cny_rate": 7.00,
+    "claude_pricing_source": "https://claude.com/pricing#api",
+    "codex_pricing_source": "https://openai.com/api/pricing",
+    "last_updated": "2026-07-06",
+    "note": "CNY models have currency:CNY. Fallback: qwen3.7-max for unmatched models."
+  },
+  "models_usd_per_mtok": {
+    "claude-fable-5":  {"input": 10, "output": 50, "cache_write_5m": 12.50, "cache_write_1h": 20, "cache_read": 1.00},
+    "claude-mythos-5": {"input": 10, "output": 50, "cache_write_5m": 12.50, "cache_write_1h": 20, "cache_read": 1.00},
+    "claude-opus-4-5": {"input": 5, "output": 25, "cache_write_5m": 6.25, "cache_write_1h": 10, "cache_read": 0.50},
+    "claude-opus-4-6": {"input": 5, "output": 25, "cache_write_5m": 6.25, "cache_write_1h": 10, "cache_read": 0.50},
+    "claude-opus-4-7": {"input": 5, "output": 25, "cache_write_5m": 6.25, "cache_write_1h": 10, "cache_read": 0.50},
+    "claude-opus-4-8": {"input": 5, "output": 25, "cache_write_5m": 6.25, "cache_write_1h": 10, "cache_read": 0.50},
+    "claude-sonnet-4-5": {"input": 3, "output": 15, "cache_write_5m": 3.75, "cache_write_1h": 6, "cache_read": 0.30},
+    "claude-sonnet-4-6": {"input": 3, "output": 15, "cache_write_5m": 3.75, "cache_write_1h": 6, "cache_read": 0.30},
+    "claude-haiku-4-5": {"input": 1, "output": 5, "cache_write_5m": 1.25, "cache_write_1h": 2, "cache_read": 0.10},
+    "qwen3.7-max":   {"input": 12,  "output": 36,  "cache_write_5m": 15,   "cache_write_1h": 15,   "cache_read": 1.2,  "currency": "CNY"},
+    "qwen3.7-plus":  {"input": 2,   "output": 8,   "cache_write_5m": 2.5,  "cache_write_1h": 2.5,  "cache_read": 0.2,  "currency": "CNY"},
+    "qwen3.6-plus":  {"input": 2,   "output": 12,  "cache_write_5m": 2.5,  "cache_write_1h": 2.5,  "cache_read": 0.2,  "currency": "CNY"},
+    "qwen3.6-flash": {"input": 1.2, "output": 7.2, "cache_write_5m": 1.5,  "cache_write_1h": 1.5,  "cache_read": 0.12, "currency": "CNY"},
+    "deepseek-v4-pro":   {"input": 12, "output": 24, "cache_write_5m": 12, "cache_write_1h": 12, "cache_read": 1,   "currency": "CNY"},
+    "deepseek-v4-flash": {"input": 1,  "output": 2,  "cache_write_5m": 1,  "cache_write_1h": 1,  "cache_read": 0.2, "currency": "CNY"},
+    "glm-5.1": {"input": 6, "output": 24, "cache_write_5m": 7.5, "cache_write_1h": 7.5, "cache_read": 0.6, "currency": "CNY"}
+  },
+  "fallback_model": "qwen3.7-max",
+  "codex_models_usd_per_mtok": {
+    "gpt-5.5":      {"input": 5,     "cached_input": 0.5,    "output": 30},
+    "gpt-5.5-pro":  {"input": 30,    "cached_input": 30,     "output": 180},
+    "gpt-5.4":      {"input": 2.5,   "cached_input": 0.25,   "output": 15},
+    "gpt-5.4-mini": {"input": 0.75,  "cached_input": 0.075,  "output": 4.5},
+    "gpt-5.4-nano": {"input": 0.2,   "cached_input": 0.02,   "output": 1.25},
+    "gpt-5.2":      {"input": 1.75,  "cached_input": 0.175,  "output": 14},
+    "gpt-5.1":      {"input": 1.25,  "cached_input": 0.125,  "output": 10},
+    "gpt-5":        {"input": 1.25,  "cached_input": 0.125,  "output": 10},
+    "gpt-5-mini":   {"input": 0.25,  "cached_input": 0.025,  "output": 2},
+    "gpt-4.1":      {"input": 2,     "cached_input": 0.5,    "output": 8},
+    "gpt-4.1-mini": {"input": 0.4,   "cached_input": 0.1,    "output": 1.6},
+    "gpt-4o":       {"input": 2.5,   "cached_input": 1.25,   "output": 10},
+    "gpt-4o-mini":  {"input": 0.15,  "cached_input": 0.075,  "output": 0.6},
+    "o3":           {"input": 2,     "cached_input": 0.5,    "output": 8},
+    "o4-mini":      {"input": 1.1,   "cached_input": 0.275,  "output": 4.4}
+  },
+  "codex_fallback_model": "gpt-5.5"
+}

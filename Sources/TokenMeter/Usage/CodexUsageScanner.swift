@@ -19,11 +19,12 @@ struct CodexFileScanResult: Codable {
     let latestTrustedQuota: CodexQuotaSnapshot?
     let latestUntrustedQuota: CodexQuotaSnapshot?
     let latestNonzeroPrimaryQuota: CodexQuotaSnapshot?
+    let threadId: String?
 }
 
 struct CodexUsageScanner {
     private let codexDir: URL
-    private let cache = IncrementalCache<CodexFileScanResult>(name: "codex_usage")
+    private let cache = IncrementalCache<CodexFileScanResult>(name: "codex_usage_v2")
 
     init() {
         let home = FileManager.default.homeDirectoryForCurrentUser
@@ -40,6 +41,7 @@ struct CodexUsageScanner {
 
         var allRecords: [UsageRecord] = []
         var validPaths = Set<String>()
+        var jsonlThreadIds = Set<String>()
 
         var latestTrustedQuota: CodexQuotaSnapshot?
         var latestUntrustedQuota: CodexQuotaSnapshot?
@@ -62,6 +64,10 @@ struct CodexUsageScanner {
                 if !cache.needsRescan(url) {
                     if let cached = cache.get(url) {
                         allRecords.append(contentsOf: cached.records)
+
+                        if let tid = cached.threadId {
+                            jsonlThreadIds.insert(tid)
+                        }
 
                         if let trusted = cached.latestTrustedQuota {
                             if latestTrustedQuota == nil || trusted.timestamp > latestTrustedQuota!.timestamp {
@@ -88,6 +94,10 @@ struct CodexUsageScanner {
                 cache.set(url, signature: signature, data: scanResult)
                 allRecords.append(contentsOf: scanResult.records)
 
+                if let tid = scanResult.threadId {
+                    jsonlThreadIds.insert(tid)
+                }
+
                 if let trusted = scanResult.latestTrustedQuota {
                     if latestTrustedQuota == nil || trusted.timestamp > latestTrustedQuota!.timestamp {
                         latestTrustedQuota = trusted
@@ -108,6 +118,10 @@ struct CodexUsageScanner {
 
         cache.cleanup(validPaths: validPaths)
         cache.save()
+
+        // Supplement with logs-only side/temporary chat records
+        let logsOnlyRecords = scanLogsOnlyRecords(knownJSONLThreadIds: jsonlThreadIds, jsonlRecords: allRecords)
+        allRecords.append(contentsOf: logsOnlyRecords)
 
         let summary = aggregate(allRecords)
 
@@ -137,13 +151,14 @@ struct CodexUsageScanner {
 
     private func parseJSONL(_ url: URL) -> CodexFileScanResult {
         guard let data = try? String(contentsOf: url, encoding: .utf8) else {
-            return CodexFileScanResult(records: [], latestTrustedQuota: nil, latestUntrustedQuota: nil, latestNonzeroPrimaryQuota: nil)
+            return CodexFileScanResult(records: [], latestTrustedQuota: nil, latestUntrustedQuota: nil, latestNonzeroPrimaryQuota: nil, threadId: nil)
         }
 
         var records: [UsageRecord] = []
         var latestTrustedQuota: CodexQuotaSnapshot?
         var latestUntrustedQuota: CodexQuotaSnapshot?
         var latestNonzeroPrimaryQuota: CodexQuotaSnapshot?
+        var threadId: String?
 
         let configPath = codexDir.appendingPathComponent("config.toml")
         let defaultModel = readTomlValue(from: configPath, key: "model") ?? "gpt-5.5"
@@ -165,6 +180,13 @@ struct CodexUsageScanner {
                 guard let json = json else { continue }
 
                 let type = json["type"] as? String
+
+                if type == "session_meta",
+                   let payload = json["payload"] as? [String: Any],
+                   let tid = payload["id"] as? String, !tid.isEmpty {
+                    threadId = tid
+                    continue
+                }
 
                 if type == "turn_context",
                    let payload = json["payload"] as? [String: Any] {
@@ -284,7 +306,8 @@ struct CodexUsageScanner {
             records: records,
             latestTrustedQuota: latestTrustedQuota,
             latestUntrustedQuota: latestUntrustedQuota,
-            latestNonzeroPrimaryQuota: latestNonzeroPrimaryQuota
+            latestNonzeroPrimaryQuota: latestNonzeroPrimaryQuota,
+            threadId: threadId
         )
     }
 
@@ -384,5 +407,136 @@ struct CodexUsageScanner {
 
         formatter.formatOptions = [.withInternetDateTime]
         return formatter.date(from: str)
+    }
+
+    // MARK: - Logs-only supplemental scan
+
+    private func scanLogsOnlyRecords(knownJSONLThreadIds: Set<String>, jsonlRecords: [UsageRecord]) -> [UsageRecord] {
+        let logsDbPath = codexDir.appendingPathComponent("logs_2.sqlite").path
+        guard FileManager.default.fileExists(atPath: logsDbPath) else { return [] }
+
+        var db: OpaquePointer?
+        let flags = SQLITE_OPEN_READONLY | SQLITE_OPEN_URI
+        guard sqlite3_open_v2("file:\(logsDbPath)?mode=ro", &db, flags, nil) == SQLITE_OK else {
+            return []
+        }
+        defer { sqlite3_close(db) }
+
+        let query = """
+            SELECT ts, thread_id, feedback_log_body FROM logs
+            WHERE feedback_log_body LIKE '%: post sampling token usage turn_id=%'
+            ORDER BY ts ASC
+            """
+
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, query, -1, &stmt, nil) == SQLITE_OK else {
+            return []
+        }
+        defer { sqlite3_finalize(stmt) }
+
+        let dayRates = computeDailyEffectiveRates(from: jsonlRecords)
+        let fallbackRate = 5.0 / 1_000_000.0 * 7.0
+
+        let configPath = codexDir.appendingPathComponent("config.toml")
+        let defaultModel = readTomlValue(from: configPath, key: "model") ?? "gpt-5.5"
+
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "yyyy-MM-dd"
+        dateFormatter.timeZone = TimeZone(identifier: "Asia/Shanghai")
+
+        var records: [UsageRecord] = []
+
+        while sqlite3_step(stmt) == SQLITE_ROW {
+            let ts = sqlite3_column_int64(stmt, 0)
+            let threadIdPtr = sqlite3_column_text(stmt, 1)
+            let bodyPtr = sqlite3_column_text(stmt, 2)
+
+            let threadId = threadIdPtr.map { String(cString: $0) } ?? ""
+            let body = bodyPtr.map { String(cString: $0) } ?? ""
+
+            if body.contains(": ToolCall:") { continue }
+
+            guard !threadId.isEmpty else { continue }
+            guard !knownJSONLThreadIds.contains(threadId) else { continue }
+
+            guard let totalTokens = extractInt(after: "total_usage_tokens=", in: body), totalTokens > 0 else {
+                continue
+            }
+
+            let timestamp = Date(timeIntervalSince1970: TimeInterval(ts))
+            let dateKey = dateFormatter.string(from: timestamp)
+            let rate = dayRates[dateKey] ?? fallbackRate
+            let costCNY = Double(totalTokens) * rate
+
+            let model = extractValue(after: "model=", in: body) ?? defaultModel
+
+            let tokenUsage = UsageRecord.TokenUsage(
+                input: totalTokens,
+                output: 0,
+                cacheWrite5m: 0,
+                cacheWrite1h: 0,
+                cacheRead: 0
+            )
+
+            let messageId = "\(threadId)-\(ts)-\(totalTokens)"
+
+            let record = UsageRecord(
+                messageId: messageId,
+                timestamp: timestamp,
+                model: model,
+                tokens: tokenUsage,
+                costCNY: costCNY,
+                source: .codex
+            )
+            records.append(record)
+        }
+
+        return records
+    }
+
+    private func computeDailyEffectiveRates(from records: [UsageRecord]) -> [String: Double] {
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "yyyy-MM-dd"
+        dateFormatter.timeZone = TimeZone(identifier: "Asia/Shanghai")
+
+        var dayTokens: [String: Int] = [:]
+        var dayCost: [String: Double] = [:]
+
+        for record in records where record.source == .codex {
+            let dateKey = dateFormatter.string(from: record.timestamp)
+            dayTokens[dateKey, default: 0] += record.tokens.total
+            dayCost[dateKey, default: 0.0] += record.costCNY
+        }
+
+        var rates: [String: Double] = [:]
+        for (day, tokens) in dayTokens {
+            let cost = dayCost[day] ?? 0
+            if tokens > 0 && cost > 0 {
+                rates[day] = cost / Double(tokens)
+            }
+        }
+        return rates
+    }
+
+    private func extractInt(after prefix: String, in string: String) -> Int? {
+        guard let range = string.range(of: prefix) else { return nil }
+        let start = range.upperBound
+        var end = start
+        while end < string.endIndex && string[end].isNumber {
+            end = string.index(after: end)
+        }
+        guard start < end else { return nil }
+        return Int(string[start..<end])
+    }
+
+    private func extractValue(after prefix: String, in string: String) -> String? {
+        guard let range = string.range(of: prefix) else { return nil }
+        let start = range.upperBound
+        var end = start
+        while end < string.endIndex && !string[end].isWhitespace && string[end] != "}" && string[end] != "," {
+            end = string.index(after: end)
+        }
+        guard start < end else { return nil }
+        return String(string[start..<end])
     }
 }

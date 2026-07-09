@@ -5,7 +5,7 @@ A macOS menu bar app that tracks local token usage and costs for AI coding tools
 ## Features
 
 - **Claude Code usage tracking** — Scans `~/.claude/projects/**/*.jsonl` for token consumption
-- **Codex usage tracking** — Scans `~/.codex/sessions/**/*.jsonl` for token consumption
+- **Codex usage tracking** — Scans `~/.codex/sessions/**/*.jsonl` for token consumption, supplemented by `~/.codex/logs_2.sqlite` for side/temporary chat sessions not present in JSONL (tokens exact, cost estimated via daily effective-rate)
 - **Codex quota monitoring** — Displays 5H/7D rolling window quota remaining
 - **Multi-model pricing** — Supports Claude, GPT, Qwen, GLM, DeepSeek with per-model cost calculation
 - **Dual currency** — USD models auto-converted to CNY; CNY-native models priced directly
@@ -32,7 +32,7 @@ bash scripts/install.sh
 TokenMeter runs as a menu bar app (no Dock icon). Every 5 minutes it:
 
 1. Scans Claude Code JSONL logs for assistant messages with token usage
-2. Scans Codex JSONL logs for token_count events and rate_limit quota data
+2. Scans Codex JSONL logs for token_count events and rate_limit quota data; supplements with logs_2.sqlite for logs-only side/temporary chats (deduplicated by JSONL thread IDs)
 3. Calculates cost using `pricing.json` (per-model pricing, supports USD and CNY)
 4. Renders today's token count + cost in the menu bar
 5. Shows a dropdown with daily breakdown, weekly/monthly totals, and Codex quota status

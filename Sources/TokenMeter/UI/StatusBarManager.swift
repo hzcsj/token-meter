@@ -1,6 +1,6 @@
 import AppKit
 
-final class StatusBarManager: NSObject {
+final class StatusBarManager: NSObject, NSMenuDelegate {
     static let shared = StatusBarManager()
 
     private var statusItem: NSStatusItem!
@@ -11,11 +11,15 @@ final class StatusBarManager: NSObject {
     private let codexScanner = CodexUsageScanner()
 
     private let refreshInterval: TimeInterval = 300
+    private let refreshDebounce: TimeInterval = 5
     private var timer: Timer?
 
     private var currentClaudeUsage: UsageSummary?
     private var currentCodexUsage: UsageSummary?
     private var currentCodexQuota: CodexQuota?
+
+    private var isRefreshing = false
+    private var lastRefreshAt: Date = .distantPast
 
     private override init() {
         super.init()
@@ -29,16 +33,10 @@ final class StatusBarManager: NSObject {
             return
         }
 
-        refresh()
+        refreshIfNeeded(force: true)
 
         timer = Timer.scheduledTimer(withTimeInterval: refreshInterval, repeats: true) { [weak self] _ in
-            self?.refresh()
-        }
-    }
-
-    @objc func refresh() {
-        Task {
-            await refreshAsync()
+            self?.refreshIfNeeded(force: false)
         }
     }
 
@@ -47,7 +45,25 @@ final class StatusBarManager: NSObject {
         NSWorkspace.shared.open(url)
     }
 
+    // MARK: - NSMenuDelegate
+
+    func menuWillOpen(_ menu: NSMenu) {
+        refreshIfNeeded(force: false)
+    }
+
     // MARK: - Private
+
+    private func refreshIfNeeded(force: Bool) {
+        if !force && Date().timeIntervalSince(lastRefreshAt) < refreshDebounce {
+            return
+        }
+        guard !isRefreshing else { return }
+        isRefreshing = true
+
+        Task {
+            await refreshAsync()
+        }
+    }
 
     private func refreshAsync() async {
         let claudeUsage = claudeScanner.scan()
@@ -58,6 +74,8 @@ final class StatusBarManager: NSObject {
         currentCodexQuota = codexQuota
 
         await MainActor.run {
+            lastRefreshAt = Date()
+            isRefreshing = false
             renderUI()
         }
     }
@@ -84,6 +102,7 @@ final class StatusBarManager: NSObject {
             codexQuota: currentCodexQuota
         )
 
+        menu.delegate = self
         statusItem.menu = menu
     }
 }

@@ -26,10 +26,6 @@ struct MenuBuilder {
             addLocalUsageSection(usage, to: menu, columns: columns!)
         }
 
-        menu.addItem(NSMenuItem.separator())
-
-        addActionButton("🔄 立即刷新", action: #selector(StatusBarManager.refresh), to: menu)
-
         addVerticalPadding(to: menu)
 
         return menu
@@ -227,14 +223,6 @@ struct MenuBuilder {
             monthTotal: monthTotal,
             allTimeTotal: allTimeTotal
         )
-    }
-
-    // MARK: - Action Buttons
-
-    private func addActionButton(_ title: String, action: Selector, to menu: NSMenu) {
-        let item = NSMenuItem(title: title, action: action, keyEquivalent: "")
-        item.target = StatusBarManager.shared
-        menu.addItem(item)
     }
 
     // MARK: - Helpers

@@ -1,14 +1,15 @@
 {
   "_meta": {
     "usd_to_cny_rate": 7.00,
-    "claude_pricing_source": "https://claude.com/pricing#api",
-    "codex_pricing_source": "https://openai.com/api/pricing",
-    "last_updated": "2026-07-06",
-    "note": "CNY models have currency:CNY. Fallback: qwen3.7-max for unmatched models."
+    "claude_pricing_source": "https://platform.claude.com/docs/en/about-claude/pricing",
+    "codex_pricing_source": "https://developers.openai.com/api/docs/pricing (Standard tier)",
+    "last_updated": "2026-07-10",
+    "note": "Virtual costs use standard list prices without temporary discounts. GPT-5.6 switches to long-context rates above 272K input tokens."
   },
   "models_usd_per_mtok": {
     "claude-fable-5":  {"input": 10, "output": 50, "cache_write_5m": 12.50, "cache_write_1h": 20, "cache_read": 1.00},
     "claude-mythos-5": {"input": 10, "output": 50, "cache_write_5m": 12.50, "cache_write_1h": 20, "cache_read": 1.00},
+    "claude-sonnet-5": {"input": 3,  "output": 15, "cache_write_5m": 3.75,  "cache_write_1h": 6,  "cache_read": 0.30},
     "claude-opus-4-5": {"input": 5, "output": 25, "cache_write_5m": 6.25, "cache_write_1h": 10, "cache_read": 0.50},
     "claude-opus-4-6": {"input": 5, "output": 25, "cache_write_5m": 6.25, "cache_write_1h": 10, "cache_read": 0.50},
     "claude-opus-4-7": {"input": 5, "output": 25, "cache_write_5m": 6.25, "cache_write_1h": 10, "cache_read": 0.50},
@@ -26,9 +27,14 @@
   },
   "fallback_model": "qwen3.7-max",
   "codex_models_usd_per_mtok": {
-    "gpt-5.5":      {"input": 5,     "cached_input": 0.5,    "output": 30},
-    "gpt-5.5-pro":  {"input": 30,    "cached_input": 30,     "output": 180},
-    "gpt-5.4":      {"input": 2.5,   "cached_input": 0.25,   "output": 15},
+    "gpt-5.6":       {"input": 5,     "cached_input": 0.5,    "output": 30,  "long_context_threshold": 272000, "long_input": 10, "long_cached_input": 1, "long_output": 45},
+    "gpt-5.6-sol":   {"input": 5,     "cached_input": 0.5,    "output": 30,  "long_context_threshold": 272000, "long_input": 10, "long_cached_input": 1, "long_output": 45},
+    "gpt-5.6-terra": {"input": 2.5,   "cached_input": 0.25,   "output": 15,  "long_context_threshold": 272000, "long_input": 5,  "long_cached_input": 0.5, "long_output": 22.5},
+    "gpt-5.6-luna":  {"input": 1,     "cached_input": 0.1,    "output": 6,   "long_context_threshold": 272000, "long_input": 2,  "long_cached_input": 0.2, "long_output": 9},
+    "gpt-5.5":       {"input": 5,     "cached_input": 0.5,    "output": 30,  "long_context_threshold": 272000, "long_input": 10, "long_cached_input": 1, "long_output": 45},
+    "gpt-5.5-pro":   {"input": 30,    "cached_input": 30,     "output": 180, "long_context_threshold": 272000, "long_input": 60, "long_cached_input": 60, "long_output": 270},
+    "gpt-5.4":       {"input": 2.5,   "cached_input": 0.25,   "output": 15,  "long_context_threshold": 272000, "long_input": 5,  "long_cached_input": 0.5, "long_output": 22.5},
+    "gpt-5.4-pro":   {"input": 30,    "cached_input": 30,     "output": 180, "long_context_threshold": 272000, "long_input": 60, "long_cached_input": 60, "long_output": 270},
     "gpt-5.4-mini": {"input": 0.75,  "cached_input": 0.075,  "output": 4.5},
     "gpt-5.4-nano": {"input": 0.2,   "cached_input": 0.02,   "output": 1.25},
     "gpt-5.2":      {"input": 1.75,  "cached_input": 0.175,  "output": 14},
@@ -42,5 +48,5 @@
     "o3":           {"input": 2,     "cached_input": 0.5,    "output": 8},
     "o4-mini":      {"input": 1.1,   "cached_input": 0.275,  "output": 4.4}
   },
-  "codex_fallback_model": "gpt-5.5"
+  "codex_fallback_model": "gpt-5.6-sol"
 }

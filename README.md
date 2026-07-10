@@ -43,8 +43,10 @@ Model prices are defined in `Resources/pricing.json`. To add a new model, add an
 
 - `models_usd_per_mtok` — For Claude Code models (USD per million tokens)
 - `codex_models_usd_per_mtok` — For Codex/GPT models (USD per million tokens)
+- `long_context_threshold` / `long_*` — Optional Codex long-context rates (GPT-5.6/5.5/5.4 use the official 272K threshold)
 
 Models with `"currency": "CNY"` are priced directly in CNY.
+Virtual costs use official standard list prices; temporary promotions, Batch, and Flex discounts are intentionally ignored.
 
 ## Uninstall
 

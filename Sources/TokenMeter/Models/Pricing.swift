@@ -42,11 +42,30 @@ struct Pricing: Codable {
         let input: Double
         let cachedInput: Double
         let output: Double
+        let longContextThreshold: Int?
+        let longInput: Double?
+        let longCachedInput: Double?
+        let longOutput: Double?
 
         enum CodingKeys: String, CodingKey {
             case input
             case cachedInput = "cached_input"
             case output
+            case longContextThreshold = "long_context_threshold"
+            case longInput = "long_input"
+            case longCachedInput = "long_cached_input"
+            case longOutput = "long_output"
+        }
+
+        func effectiveRates(inputTokens: Int) -> (input: Double, cachedInput: Double, output: Double) {
+            guard let threshold = longContextThreshold, inputTokens > threshold else {
+                return (input, cachedInput, output)
+            }
+            return (
+                longInput ?? input,
+                longCachedInput ?? cachedInput,
+                longOutput ?? output
+            )
         }
     }
 
@@ -65,10 +84,10 @@ extension Pricing {
             return price
         }
 
-        for (key, price) in modelsUSD {
-            if model.hasPrefix(key) {
-                return price
-            }
+        if let key = modelsUSD.keys
+            .filter({ model.isPricingVariant(of: $0) })
+            .max(by: { $0.count < $1.count }) {
+            return modelsUSD[key]!
         }
 
         return modelsUSD[fallbackModel] ?? modelsUSD.values.first!
@@ -79,12 +98,21 @@ extension Pricing {
             return price
         }
 
-        for (key, price) in codexModelsUSD {
-            if model.hasPrefix(key) {
-                return price
-            }
+        if let key = codexModelsUSD.keys
+            .filter({ model.isPricingVariant(of: $0) })
+            .max(by: { $0.count < $1.count }) {
+            return codexModelsUSD[key]!
         }
 
         return codexModelsUSD[codexFallbackModel] ?? codexModelsUSD.values.first!
+    }
+}
+
+private extension String {
+    func isPricingVariant(of baseModel: String) -> Bool {
+        guard self != baseModel, hasPrefix(baseModel) else { return false }
+        let suffix = dropFirst(baseModel.count)
+        return suffix.hasPrefix("-") || suffix.hasPrefix("[") ||
+            suffix.hasPrefix(":") || suffix.hasPrefix("@")
     }
 }

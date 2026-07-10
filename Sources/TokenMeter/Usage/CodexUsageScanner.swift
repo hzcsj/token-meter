@@ -24,7 +24,7 @@ struct CodexFileScanResult: Codable {
 
 struct CodexUsageScanner {
     private let codexDir: URL
-    private let cache = IncrementalCache<CodexFileScanResult>(name: "codex_usage_v2")
+    private let cache = IncrementalCache<CodexFileScanResult>(name: "codex_usage_v3")
 
     init() {
         let home = FileManager.default.homeDirectoryForCurrentUser
@@ -161,7 +161,7 @@ struct CodexUsageScanner {
         var threadId: String?
 
         let configPath = codexDir.appendingPathComponent("config.toml")
-        let defaultModel = readTomlValue(from: configPath, key: "model") ?? "gpt-5.5"
+        let defaultModel = readTomlValue(from: configPath, key: "model") ?? "gpt-5.6-sol"
         let defaultServiceTier = readTomlValue(from: configPath, key: "service_tier") ?? "default"
 
         var currentModel = defaultModel
@@ -438,7 +438,7 @@ struct CodexUsageScanner {
         let fallbackRate = 5.0 / 1_000_000.0 * 7.0
 
         let configPath = codexDir.appendingPathComponent("config.toml")
-        let defaultModel = readTomlValue(from: configPath, key: "model") ?? "gpt-5.5"
+        let defaultModel = readTomlValue(from: configPath, key: "model") ?? "gpt-5.6-sol"
 
         let dateFormatter = DateFormatter()
         dateFormatter.dateFormat = "yyyy-MM-dd"

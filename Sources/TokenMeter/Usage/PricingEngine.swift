@@ -26,7 +26,7 @@ final class PricingEngine {
             modelsUSD: [:],
             fallbackModel: "qwen3.7-max",
             codexModelsUSD: [:],
-            codexFallbackModel: "gpt-5.5"
+            codexFallbackModel: "gpt-5.6-sol"
         )
     }
 
@@ -56,11 +56,12 @@ final class PricingEngine {
         let rate = pricing.meta.exchangeRateUSDtoCNY
 
         let nonCachedInput = max(0, input - cachedInput)
+        let rates = price.effectiveRates(inputTokens: input)
 
         let usd = (
-            Double(nonCachedInput) * price.input +
-            Double(cachedInput) * price.cachedInput +
-            Double(output + reasoning) * price.output
+            Double(nonCachedInput) * rates.input +
+            Double(cachedInput) * rates.cachedInput +
+            Double(output + reasoning) * rates.output
         ) / 1_000_000.0
 
         var cost = usd * rate

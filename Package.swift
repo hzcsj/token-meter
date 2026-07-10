@@ -9,6 +9,10 @@ let package = Package(
         .executableTarget(
             name: "TokenMeter",
             path: "Sources/TokenMeter"
+        ),
+        .testTarget(
+            name: "TokenMeterTests",
+            dependencies: ["TokenMeter"]
         )
     ]
 )

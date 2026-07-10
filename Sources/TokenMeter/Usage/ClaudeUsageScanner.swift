@@ -2,7 +2,7 @@ import Foundation
 
 struct ClaudeUsageScanner {
     private let projectsDir: URL
-    private let cache = IncrementalCache<[UsageRecord]>(name: "claude_usage")
+    private let cache = IncrementalCache<[UsageRecord]>(name: "claude_usage_v2")
 
     init() {
         let home = FileManager.default.homeDirectoryForCurrentUser

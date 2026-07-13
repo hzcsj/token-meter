@@ -9,6 +9,7 @@ final class StatusBarManager: NSObject, NSMenuDelegate {
 
     private let claudeScanner = ClaudeUsageScanner()
     private let codexScanner = CodexUsageScanner()
+    private let openCodeScanner = OpenCodeUsageScanner()
 
     private let refreshInterval: TimeInterval = 300
     private let refreshDebounce: TimeInterval = 5
@@ -16,6 +17,7 @@ final class StatusBarManager: NSObject, NSMenuDelegate {
 
     private var currentClaudeUsage: UsageSummary?
     private var currentCodexUsage: UsageSummary?
+    private var currentOpenCodeUsage: UsageSummary?
     private var currentCodexQuota: CodexQuota?
 
     private var isRefreshing = false
@@ -68,9 +70,11 @@ final class StatusBarManager: NSObject, NSMenuDelegate {
     private func refreshAsync() async {
         let claudeUsage = claudeScanner.scan()
         let (codexUsage, codexQuota) = codexScanner.scan()
+        let openCodeUsage = openCodeScanner.scan()
 
         currentClaudeUsage = claudeUsage
         currentCodexUsage = codexUsage
+        currentOpenCodeUsage = openCodeUsage
         currentCodexQuota = codexQuota
 
         await MainActor.run {
@@ -83,7 +87,11 @@ final class StatusBarManager: NSObject, NSMenuDelegate {
     private func renderUI() {
         guard let button = statusItem.button else { return }
 
-        let mergedUsage = menuBuilder.mergeUsage(claude: currentClaudeUsage, codex: currentCodexUsage)
+        let mergedUsage = menuBuilder.mergeUsage([
+            currentClaudeUsage,
+            currentCodexUsage,
+            currentOpenCodeUsage
+        ])
 
         let image: NSImage
         let todayStr = DateFormatter.yyyyMMdd.string(from: Date())
@@ -99,6 +107,7 @@ final class StatusBarManager: NSObject, NSMenuDelegate {
         let menu = menuBuilder.build(
             claudeUsage: currentClaudeUsage,
             codexUsage: currentCodexUsage,
+            openCodeUsage: currentOpenCodeUsage,
             codexQuota: currentCodexQuota
         )
 

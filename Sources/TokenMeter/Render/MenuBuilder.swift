@@ -7,6 +7,7 @@ struct MenuBuilder {
     func build(
         claudeUsage: UsageSummary?,
         codexUsage: UsageSummary?,
+        openCodeUsage: UsageSummary?,
         codexQuota: CodexQuota?
     ) -> NSMenu {
         let menu = NSMenu()
@@ -14,7 +15,7 @@ struct MenuBuilder {
 
         addVerticalPadding(to: menu)
 
-        let mergedUsage = mergeUsage(claude: claudeUsage, codex: codexUsage)
+        let mergedUsage = mergeUsage([claudeUsage, codexUsage, openCodeUsage])
         let columns = mergedUsage.map { calculateColumns(usage: $0) }
 
         if let quota = codexQuota {
@@ -130,25 +131,14 @@ struct MenuBuilder {
 
     // MARK: - Merge Usage
 
-    func mergeUsage(claude: UsageSummary?, codex: UsageSummary?) -> UsageSummary? {
-        if claude == nil && codex == nil {
-            return nil
-        }
+    func mergeUsage(_ summaries: [UsageSummary?], now: Date = Date()) -> UsageSummary? {
+        let availableSummaries = summaries.compactMap { $0 }
+        guard !availableSummaries.isEmpty else { return nil }
 
         var mergedByDay: [String: (tokens: Int, cost: Double, messages: Int)] = [:]
 
-        if let claude = claude {
-            for day in claude.byDay {
-                mergedByDay[day.date] = (
-                    tokens: day.tokens,
-                    cost: day.costCNY,
-                    messages: day.messageCount
-                )
-            }
-        }
-
-        if let codex = codex {
-            for day in codex.byDay {
+        for summary in availableSummaries {
+            for day in summary.byDay {
                 if let existing = mergedByDay[day.date] {
                     mergedByDay[day.date] = (
                         tokens: existing.tokens + day.tokens,
@@ -174,13 +164,13 @@ struct MenuBuilder {
             )
         }.sorted { $0.date > $1.date }
 
-        let calendar = Calendar(identifier: .gregorian)
-        let today = Date()
-        let todayStr = DateFormatter.yyyyMMdd.string(from: today)
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "Asia/Shanghai")!
+        let todayStr = DateFormatter.yyyyMMdd.string(from: now)
 
         var recent7Days: [String] = []
         for i in 0..<7 {
-            if let date = calendar.date(byAdding: .day, value: -i, to: today) {
+            if let date = calendar.date(byAdding: .day, value: -i, to: now) {
                 recent7Days.append(DateFormatter.yyyyMMdd.string(from: date))
             }
         }

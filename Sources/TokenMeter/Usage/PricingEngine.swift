@@ -8,7 +8,7 @@ final class PricingEngine {
     private init() {
         let paths = [
             Bundle.main.url(forResource: "pricing", withExtension: "json"),
-            URL(fileURLWithPath: #file).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent().appendingPathComponent("Resources/pricing.json")
+            URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent().appendingPathComponent("Resources/pricing.json")
         ]
 
         var pricingData: Pricing?

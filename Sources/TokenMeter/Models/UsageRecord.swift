@@ -11,6 +11,7 @@ struct UsageRecord: Codable, Equatable {
     enum Source: String, Codable {
         case claude
         case codex
+        case opencode
     }
 
     struct TokenUsage: Codable, Equatable {

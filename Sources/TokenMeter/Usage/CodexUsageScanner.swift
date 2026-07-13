@@ -2,8 +2,7 @@ import Foundation
 import SQLite3
 
 struct CodexQuotaSnapshot: Codable {
-    let primary: CodexQuota.Window
-    let secondary: CodexQuota.Window
+    let windows: [CodexQuota.Window]
     let planType: String
     let model: String
     let timestamp: Date
@@ -22,9 +21,30 @@ struct CodexFileScanResult: Codable {
     let threadId: String?
 }
 
+func resolveCodexQuota(
+    trusted: CodexQuotaSnapshot?,
+    untrusted: CodexQuotaSnapshot?
+) -> CodexQuota? {
+    if let trusted {
+        guard !trusted.windows.isEmpty else { return nil }
+        return CodexQuota(
+            planType: trusted.planType,
+            model: trusted.model,
+            windows: trusted.windows
+        )
+    }
+
+    guard let untrusted, !untrusted.windows.isEmpty else { return nil }
+    return CodexQuota(
+        planType: untrusted.planType,
+        model: untrusted.model,
+        windows: untrusted.windows
+    )
+}
+
 struct CodexUsageScanner {
     private let codexDir: URL
-    private let cache = IncrementalCache<CodexFileScanResult>(name: "codex_usage_v3")
+    private let cache = IncrementalCache<CodexFileScanResult>(name: "codex_usage_v4")
 
     init() {
         let home = FileManager.default.homeDirectoryForCurrentUser
@@ -125,24 +145,10 @@ struct CodexUsageScanner {
 
         let summary = aggregate(allRecords)
 
-        let codexQuota: CodexQuota?
-        if let trusted = latestTrustedQuota {
-            codexQuota = CodexQuota(
-                planType: trusted.planType,
-                model: trusted.model,
-                primary: trusted.primary,
-                secondary: trusted.secondary
-            )
-        } else if let untrusted = latestUntrustedQuota {
-            codexQuota = CodexQuota(
-                planType: untrusted.planType,
-                model: untrusted.model,
-                primary: untrusted.primary,
-                secondary: untrusted.secondary
-            )
-        } else {
-            codexQuota = nil
-        }
+        let codexQuota = resolveCodexQuota(
+            trusted: latestTrustedQuota,
+            untrusted: latestUntrustedQuota
+        )
 
         return (summary, codexQuota)
     }
@@ -245,35 +251,28 @@ struct CodexUsageScanner {
                     records.append(record)
 
                     if let rateLimits = payload["rate_limits"] as? [String: Any],
-                       let primary = rateLimits["primary"] as? [String: Any],
-                       let secondary = rateLimits["secondary"] as? [String: Any],
                        let planType = rateLimits["plan_type"] as? String {
 
                         let limitId = rateLimits["limit_id"] as? String
 
-                        let primaryUsed = primary["used_percent"] as? Double ?? 0
-                        let primaryWindowMinutes = primary["window_minutes"] as? Int ?? 300
-                        let primaryResetsAt = primary["resets_at"] as? TimeInterval ?? 0
-
-                        let secondaryUsed = secondary["used_percent"] as? Double ?? 0
-                        let secondaryWindowMinutes = secondary["window_minutes"] as? Int ?? 10080
-                        let secondaryResetsAt = secondary["resets_at"] as? TimeInterval ?? 0
-
-                        let primaryWindow = CodexQuota.Window(
-                            usedPercent: primaryUsed,
-                            windowMinutes: primaryWindowMinutes,
-                            resetsAt: Date(timeIntervalSince1970: primaryResetsAt)
-                        )
-
-                        let secondaryWindow = CodexQuota.Window(
-                            usedPercent: secondaryUsed,
-                            windowMinutes: secondaryWindowMinutes,
-                            resetsAt: Date(timeIntervalSince1970: secondaryResetsAt)
-                        )
+                        var windows: [CodexQuota.Window] = []
+                        for slot in ["primary", "secondary"] {
+                            guard let w = rateLimits[slot] as? [String: Any] else { continue }
+                            let used = w["used_percent"] as? Double ?? 0
+                            let winMin = w["window_minutes"] as? Int ?? 0
+                            let resetsAt = w["resets_at"] as? TimeInterval ?? 0
+                            guard winMin > 0 else { continue }
+                            windows.append(CodexQuota.Window(
+                                sourceSlot: slot,
+                                usedPercent: used,
+                                windowMinutes: winMin,
+                                resetsAt: Date(timeIntervalSince1970: resetsAt)
+                            ))
+                        }
+                        windows.sort { $0.windowMinutes < $1.windowMinutes }
 
                         let snapshot = CodexQuotaSnapshot(
-                            primary: primaryWindow,
-                            secondary: secondaryWindow,
+                            windows: windows,
                             planType: planType,
                             model: currentModel,
                             timestamp: timestamp,
@@ -290,7 +289,8 @@ struct CodexUsageScanner {
                             }
                         }
 
-                        if snapshot.isTrusted && primaryUsed > 0 {
+                        let hasNonzeroUsage = windows.contains { $0.usedPercent > 0 }
+                        if snapshot.isTrusted && hasNonzeroUsage {
                             if latestNonzeroPrimaryQuota == nil || snapshot.timestamp > latestNonzeroPrimaryQuota!.timestamp {
                                 latestNonzeroPrimaryQuota = snapshot
                             }

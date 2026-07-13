@@ -61,27 +61,19 @@ struct MenuBuilder {
 
         let contentWidth = columns?.contentWidth ?? fallbackContentWidth()
 
-        let primaryDisplay = quota.primary.displayData
-        let primaryLeft = "5H 额度剩余：\(String(format: "%3.0f", primaryDisplay.remainingPercent))%"
-        let primaryTimePercentStr = formatTimePercent(primaryDisplay.timePercent)
-        let primaryRight = "\(primaryDisplay.countdown)  (\(primaryTimePercentStr))"
-        let primaryColor: MenuColor = primaryDisplay.remainingPercent < primaryDisplay.timePercent ? .red : .primary
+        for window in quota.windows {
+            let display = window.displayData
+            let label = window.displayLabel
+            let left = "\(label) 额度剩余：\(String(format: "%3.0f", display.remainingPercent))%"
+            let timePercentStr = formatTimePercent(display.timePercent)
+            let right = "\(display.countdown)  (\(timePercentStr))"
+            let color: MenuColor = display.remainingPercent < display.timePercent ? .red : .primary
 
-        let primaryItem = NSMenuItem()
-        let primaryView = MenuQuotaRowView(left: primaryLeft, right: primaryRight, font: monoFont, color: primaryColor.nsColor, contentWidth: contentWidth)
-        primaryItem.view = primaryView
-        menu.addItem(primaryItem)
-
-        let secondaryDisplay = quota.secondary.displayData
-        let secondaryLeft = "7D 额度剩余：\(String(format: "%3.0f", secondaryDisplay.remainingPercent))%"
-        let secondaryTimePercentStr = formatTimePercent(secondaryDisplay.timePercent)
-        let secondaryRight = "\(secondaryDisplay.countdown)  (\(secondaryTimePercentStr))"
-        let secondaryColor: MenuColor = secondaryDisplay.remainingPercent < secondaryDisplay.timePercent ? .red : .primary
-
-        let secondaryItem = NSMenuItem()
-        let secondaryView = MenuQuotaRowView(left: secondaryLeft, right: secondaryRight, font: monoFont, color: secondaryColor.nsColor, contentWidth: contentWidth)
-        secondaryItem.view = secondaryView
-        menu.addItem(secondaryItem)
+            let item = NSMenuItem()
+            let view = MenuQuotaRowView(left: left, right: right, font: monoFont, color: color.nsColor, contentWidth: contentWidth)
+            item.view = view
+            menu.addItem(item)
+        }
     }
 
     private func formatTimePercent(_ percent: Double) -> String {

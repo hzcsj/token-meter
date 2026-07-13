@@ -71,13 +71,24 @@ struct UsageSummary: Codable, Equatable {
 struct CodexQuota: Codable, Equatable {
     let planType: String
     let model: String
-    let primary: Window   // 5h
-    let secondary: Window // 7d
+    let windows: [Window]
 
     struct Window: Codable, Equatable {
+        let sourceSlot: String
         let usedPercent: Double
         let windowMinutes: Int
         let resetsAt: Date
+
+        var displayLabel: String {
+            switch windowMinutes {
+            case 300: return "5H"
+            case 10080: return "7D"
+            default:
+                if windowMinutes % 1440 == 0 { return "\(windowMinutes / 1440)D" }
+                if windowMinutes % 60 == 0 { return "\(windowMinutes / 60)H" }
+                return "\(windowMinutes)M"
+            }
+        }
 
         var remainingPercent: Double {
             100.0 - usedPercent

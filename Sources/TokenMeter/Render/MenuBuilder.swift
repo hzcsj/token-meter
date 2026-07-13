@@ -177,21 +177,29 @@ struct MenuBuilder {
         return mergeUsage([summary], now: now)
     }
 
-    private func makeFieldTooltips(_ breakdown: SourceBreakdown) -> MenuUsageRowView.FieldTooltips {
-        MenuUsageRowView.FieldTooltips(
-            tokens: sourceTooltip(breakdown) { "\(humanizeTokens($0.tokens)) Tok" },
-            count: sourceTooltip(breakdown) { "\(humanizeCount($0.messageCount))次" },
-            cost: sourceTooltip(breakdown) { formatCost($0.costCNY, tokens: $0.tokens) }
+    private func makeFieldTooltips(_ breakdown: SourceBreakdown) -> MenuUsageRowView.FieldTooltips? {
+        let activeSources: [(name: String, usage: DailyUsage)] = [
+            ("Claude Code", breakdown.claude),
+            ("Codex", breakdown.codex),
+            ("OpenCode", breakdown.openCode)
+        ].filter { $0.usage.messageCount > 0 }
+
+        guard activeSources.count >= 2 else { return nil }
+
+        return MenuUsageRowView.FieldTooltips(
+            tokens: sourceTooltip(activeSources, total: breakdown.total) { "\(humanizeTokens($0.tokens)) Tok" },
+            count: sourceTooltip(activeSources, total: breakdown.total) { "\(humanizeCount($0.messageCount))次" },
+            cost: sourceTooltip(activeSources, total: breakdown.total) { formatCost($0.costCNY, tokens: $0.tokens) }
         )
     }
 
-    private func sourceTooltip(_ breakdown: SourceBreakdown, value: (DailyUsage) -> String) -> [MenuTooltipRow] {
-        [
-            MenuTooltipRow(name: "Claude Code", value: value(breakdown.claude)),
-            MenuTooltipRow(name: "Codex", value: value(breakdown.codex)),
-            MenuTooltipRow(name: "OpenCode", value: value(breakdown.openCode)),
-            MenuTooltipRow(name: "合计", value: value(breakdown.total))
-        ]
+    private func sourceTooltip(
+        _ sources: [(name: String, usage: DailyUsage)],
+        total: DailyUsage,
+        value: (DailyUsage) -> String
+    ) -> [MenuTooltipRow] {
+        sources.map { MenuTooltipRow(name: $0.name, value: value($0.usage)) }
+            + [MenuTooltipRow(name: "合计", value: value(total))]
     }
 
     func mergeUsage(_ summaries: [UsageSummary?], now: Date = Date()) -> UsageSummary? {

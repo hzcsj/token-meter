@@ -183,7 +183,7 @@ final class OpenCodeUsageScannerTests: XCTestCase {
         XCTAssertEqual(merged.allTimeTotal.messageCount, 10)
     }
 
-    func testLocalUsageRowsExposeFieldLevelSourceTooltips() throws {
+    func testLocalUsageRowsRequireMultipleSourcesAndHideZeroSourceRows() throws {
         let today = DateFormatter.yyyyMMdd.string(from: Date())
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = TimeZone(identifier: "Asia/Shanghai")!
@@ -205,31 +205,34 @@ final class OpenCodeUsageScannerTests: XCTestCase {
         let rows = menu.items.compactMap { $0.view as? MenuUsageRowView }
 
         XCTAssertEqual(rows.count, 5)
-        for row in rows {
+        for row in [rows[0]] + Array(rows.dropFirst(2)) {
             XCTAssertFalse(field("usage.label", in: row) is MenuTooltipTextField)
             for identifier in ["usage.tokens", "usage.count", "usage.cost"] {
                 let tooltipField = field(identifier, in: row) as? MenuTooltipTextField
                 XCTAssertNil(tooltipField?.toolTip)
-                XCTAssertEqual(tooltipField?.tooltipRows.count, 4)
+                XCTAssertEqual(tooltipField?.tooltipRows.count, 3)
             }
+        }
+
+        let singleSourceRow = rows[1]
+        for identifier in ["usage.tokens", "usage.count", "usage.cost"] {
+            XCTAssertFalse(field(identifier, in: singleSourceRow) is MenuTooltipTextField)
+            XCTAssertNil(tooltipRows(identifier, in: singleSourceRow))
         }
 
         let row = try XCTUnwrap(rows.first)
         XCTAssertEqual(tooltipRows("usage.tokens", in: row), [
             MenuTooltipRow(name: "Claude Code", value: "100 Tok"),
-            MenuTooltipRow(name: "Codex", value: "0 Tok"),
             MenuTooltipRow(name: "OpenCode", value: "300 Tok"),
             MenuTooltipRow(name: "合计", value: "400 Tok")
         ])
         XCTAssertEqual(tooltipRows("usage.count", in: row), [
             MenuTooltipRow(name: "Claude Code", value: "1次"),
-            MenuTooltipRow(name: "Codex", value: "0次"),
             MenuTooltipRow(name: "OpenCode", value: "3次"),
             MenuTooltipRow(name: "合计", value: "4次")
         ])
         XCTAssertEqual(tooltipRows("usage.cost", in: row), [
             MenuTooltipRow(name: "Claude Code", value: "¥1.00"),
-            MenuTooltipRow(name: "Codex", value: "¥0.00"),
             MenuTooltipRow(name: "OpenCode", value: "Free"),
             MenuTooltipRow(name: "合计", value: "¥1.00")
         ])
@@ -237,19 +240,16 @@ final class OpenCodeUsageScannerTests: XCTestCase {
         let allTimeRow = try XCTUnwrap(rows.last)
         XCTAssertEqual(tooltipRows("usage.tokens", in: allTimeRow), [
             MenuTooltipRow(name: "Claude Code", value: "150 Tok"),
-            MenuTooltipRow(name: "Codex", value: "0 Tok"),
             MenuTooltipRow(name: "OpenCode", value: "300 Tok"),
             MenuTooltipRow(name: "合计", value: "450 Tok")
         ])
         XCTAssertEqual(tooltipRows("usage.count", in: allTimeRow), [
             MenuTooltipRow(name: "Claude Code", value: "3次"),
-            MenuTooltipRow(name: "Codex", value: "0次"),
             MenuTooltipRow(name: "OpenCode", value: "3次"),
             MenuTooltipRow(name: "合计", value: "6次")
         ])
         XCTAssertEqual(tooltipRows("usage.cost", in: allTimeRow), [
             MenuTooltipRow(name: "Claude Code", value: "¥3.00"),
-            MenuTooltipRow(name: "Codex", value: "¥0.00"),
             MenuTooltipRow(name: "OpenCode", value: "Free"),
             MenuTooltipRow(name: "合计", value: "¥3.00")
         ])

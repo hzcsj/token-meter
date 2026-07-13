@@ -12,6 +12,7 @@ A macOS menu bar app that tracks local token usage and costs for AI coding tools
 - **Dual currency** — USD models auto-converted to CNY; CNY-native models priced directly
 - **Incremental scanning** — mtime+size based cache for fast refreshes
 - **Daily breakdown** — Token count, message count, and cost per day (recent 7 days + weekly/monthly/all-time totals)
+- **Per-source hover details** — Hover Token, call-count, or cost fields for a rounded, shadowed two-column breakdown of Claude Code, Codex, OpenCode, and the combined total
 
 ## Requirements
 

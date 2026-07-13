@@ -4,6 +4,39 @@ struct MenuBuilder {
     private let monoFont = NSFont(name: "Menlo", size: 12) ?? NSFont.monospacedSystemFont(ofSize: 12, weight: .regular)
     private let smallFont = NSFont(name: "Menlo", size: 11) ?? NSFont.monospacedSystemFont(ofSize: 11, weight: .regular)
 
+    private struct SourceBreakdown {
+        let claude: DailyUsage
+        let codex: DailyUsage
+        let openCode: DailyUsage
+        let total: DailyUsage
+    }
+
+    private struct SourceSummaries {
+        let claude: UsageSummary?
+        let codex: UsageSummary?
+        let openCode: UsageSummary?
+
+        func breakdown(for total: DailyUsage) -> SourceBreakdown {
+            SourceBreakdown(
+                claude: usage(for: total, in: claude),
+                codex: usage(for: total, in: codex),
+                openCode: usage(for: total, in: openCode),
+                total: total
+            )
+        }
+
+        private func usage(for total: DailyUsage, in summary: UsageSummary?) -> DailyUsage {
+            let usage: DailyUsage?
+            switch total.date {
+            case "week": usage = summary?.weekTotal
+            case "month": usage = summary?.monthTotal
+            case "all": usage = summary?.allTimeTotal
+            default: usage = summary?.byDay.first { $0.date == total.date }
+            }
+            return usage ?? DailyUsage(date: total.date, tokens: 0, costCNY: 0, messageCount: 0)
+        }
+    }
+
     func build(
         claudeUsage: UsageSummary?,
         codexUsage: UsageSummary?,
@@ -15,7 +48,13 @@ struct MenuBuilder {
 
         addVerticalPadding(to: menu)
 
-        let mergedUsage = mergeUsage([claudeUsage, codexUsage, openCodeUsage])
+        let now = Date()
+        let mergedUsage = mergeUsage([claudeUsage, codexUsage, openCodeUsage], now: now)
+        let sourceSummaries = SourceSummaries(
+            claude: normalizedSummary(claudeUsage, now: now),
+            codex: normalizedSummary(codexUsage, now: now),
+            openCode: normalizedSummary(openCodeUsage, now: now)
+        )
         let columns = mergedUsage.map { calculateColumns(usage: $0) }
 
         if let quota = codexQuota {
@@ -24,7 +63,7 @@ struct MenuBuilder {
         }
 
         if let usage = mergedUsage {
-            addLocalUsageSection(usage, to: menu, columns: columns!)
+            addLocalUsageSection(usage, sources: sourceSummaries, to: menu, columns: columns!)
         }
 
         addVerticalPadding(to: menu)
@@ -94,26 +133,27 @@ struct MenuBuilder {
 
     // MARK: - Local Usage Section
 
-    private func addLocalUsageSection(_ usage: UsageSummary, to menu: NSMenu, columns: MenuUsageRowView.ColumnWidths) {
+    private func addLocalUsageSection(_ usage: UsageSummary, sources: SourceSummaries, to menu: NSMenu, columns: MenuUsageRowView.ColumnWidths) {
         let title = "📈 本地用量统计"
         addTextRow(title, color: .secondary, font: smallFont, to: menu)
 
         for day in usage.byDay.prefix(7) {
-            addUsageRow(day, font: monoFont, color: .primary, columns: columns, to: menu)
+            addUsageRow(day, sources: sources, font: monoFont, color: .primary, columns: columns, to: menu)
         }
 
         menu.addItem(NSMenuItem.separator())
 
-        addUsageRow(usage.weekTotal, label: "近7天累计", font: monoFont, color: .primary, columns: columns, to: menu)
-        addUsageRow(usage.monthTotal, label: "当月累计", font: monoFont, color: .primary, columns: columns, to: menu)
-        addUsageRow(usage.allTimeTotal, label: "历史累计", font: monoFont, color: .primary, columns: columns, to: menu)
+        addUsageRow(usage.weekTotal, sources: sources, label: "近7天累计", font: monoFont, color: .primary, columns: columns, to: menu)
+        addUsageRow(usage.monthTotal, sources: sources, label: "当月累计", font: monoFont, color: .primary, columns: columns, to: menu)
+        addUsageRow(usage.allTimeTotal, sources: sources, label: "历史累计", font: monoFont, color: .primary, columns: columns, to: menu)
     }
 
-    private func addUsageRow(_ usage: DailyUsage, label: String? = nil, font: NSFont, color: MenuColor, columns: MenuUsageRowView.ColumnWidths, to menu: NSMenu) {
+    private func addUsageRow(_ usage: DailyUsage, sources: SourceSummaries, label: String? = nil, font: NSFont, color: MenuColor, columns: MenuUsageRowView.ColumnWidths, to menu: NSMenu) {
         let labelText = label ?? usage.label
         let tokenText = humanizeTokens(usage.tokens)
         let countText = humanizeCount(usage.messageCount)
         let costText = formatCost(usage.costCNY, tokens: usage.tokens)
+        let tooltips = makeFieldTooltips(sources.breakdown(for: usage))
 
         let item = NSMenuItem()
         let rowView = MenuUsageRowView(
@@ -123,13 +163,36 @@ struct MenuBuilder {
             cost: costText,
             font: font,
             color: color.nsColor,
-            columns: columns
+            columns: columns,
+            tooltips: tooltips
         )
         item.view = rowView
         menu.addItem(item)
     }
 
     // MARK: - Merge Usage
+
+    private func normalizedSummary(_ summary: UsageSummary?, now: Date) -> UsageSummary? {
+        guard let summary else { return nil }
+        return mergeUsage([summary], now: now)
+    }
+
+    private func makeFieldTooltips(_ breakdown: SourceBreakdown) -> MenuUsageRowView.FieldTooltips {
+        MenuUsageRowView.FieldTooltips(
+            tokens: sourceTooltip(breakdown) { "\(humanizeTokens($0.tokens)) Tok" },
+            count: sourceTooltip(breakdown) { "\(humanizeCount($0.messageCount))次" },
+            cost: sourceTooltip(breakdown) { formatCost($0.costCNY, tokens: $0.tokens) }
+        )
+    }
+
+    private func sourceTooltip(_ breakdown: SourceBreakdown, value: (DailyUsage) -> String) -> [MenuTooltipRow] {
+        [
+            MenuTooltipRow(name: "Claude Code", value: value(breakdown.claude)),
+            MenuTooltipRow(name: "Codex", value: value(breakdown.codex)),
+            MenuTooltipRow(name: "OpenCode", value: value(breakdown.openCode)),
+            MenuTooltipRow(name: "合计", value: value(breakdown.total))
+        ]
+    }
 
     func mergeUsage(_ summaries: [UsageSummary?], now: Date = Date()) -> UsageSummary? {
         let availableSummaries = summaries.compactMap { $0 }

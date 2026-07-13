@@ -20,8 +20,14 @@ private func fieldFrame(for font: NSFont, x: CGFloat, width: CGFloat) -> NSRect 
 }
 
 private func makeField(text: String, font: NSFont, color: NSColor,
-                       x: CGFloat, width: CGFloat, alignment: NSTextAlignment) -> NSTextField {
-    let field = NSTextField(labelWithString: text)
+                       x: CGFloat, width: CGFloat, alignment: NSTextAlignment,
+                       tooltipRows: [MenuTooltipRow]? = nil) -> NSTextField {
+    let field: NSTextField
+    if let tooltipRows, !tooltipRows.isEmpty {
+        field = MenuTooltipTextField(text: text, tooltipRows: tooltipRows)
+    } else {
+        field = NSTextField(labelWithString: text)
+    }
     field.font = font
     field.textColor = color
     field.backgroundColor = .clear
@@ -53,6 +59,12 @@ final class MenuTextRowView: NSView {
 
 final class MenuUsageRowView: NSView {
     override var allowsVibrancy: Bool { false }
+
+    struct FieldTooltips: Equatable {
+        let tokens: [MenuTooltipRow]
+        let count: [MenuTooltipRow]
+        let cost: [MenuTooltipRow]
+    }
 
     struct ColumnWidths {
         let labelWidth: CGFloat
@@ -89,7 +101,8 @@ final class MenuUsageRowView: NSView {
     }
 
     convenience init(label: String, tokens: String, count: String, cost: String,
-                     font: NSFont, color: NSColor, columns: ColumnWidths) {
+                     font: NSFont, color: NSColor, columns: ColumnWidths,
+                     tooltips: FieldTooltips? = nil) {
         let spaceWidth = textWidth(" ", font: font)
         let labelTokenGap = spaceWidth * 2
         let tokenCountGap = spaceWidth * 2
@@ -100,20 +113,31 @@ final class MenuUsageRowView: NSView {
         self.init(frame: NSRect(x: 0, y: 0, width: rowWidth, height: MenuLayout.rowHeight))
 
         let labelX = MenuLayout.leftPad
-        addSubview(makeField(text: label, font: font, color: color,
-                             x: labelX, width: columns.labelWidth, alignment: .left))
+        let labelField = makeField(text: label, font: font, color: color,
+                                   x: labelX, width: columns.labelWidth, alignment: .left)
+        labelField.identifier = NSUserInterfaceItemIdentifier("usage.label")
+        addSubview(labelField)
 
         let tokenX = labelX + columns.labelWidth + labelTokenGap
-        addSubview(makeField(text: tokens + " Tok", font: font, color: color,
-                             x: tokenX, width: columns.tokenWidth, alignment: .right))
+        let tokenField = makeField(text: tokens + " Tok", font: font, color: color,
+                                   x: tokenX, width: columns.tokenWidth, alignment: .right,
+                                   tooltipRows: tooltips?.tokens)
+        tokenField.identifier = NSUserInterfaceItemIdentifier("usage.tokens")
+        addSubview(tokenField)
 
         let countX = tokenX + columns.tokenWidth + tokenCountGap
-        addSubview(makeField(text: count + "次", font: font, color: color,
-                             x: countX, width: columns.countWidth, alignment: .right))
+        let countField = makeField(text: count + "次", font: font, color: color,
+                                   x: countX, width: columns.countWidth, alignment: .right,
+                                   tooltipRows: tooltips?.count)
+        countField.identifier = NSUserInterfaceItemIdentifier("usage.count")
+        addSubview(countField)
 
         let costX = contentRight - columns.costWidth
-        addSubview(makeField(text: cost, font: font, color: color,
-                             x: costX, width: columns.costWidth, alignment: .right))
+        let costField = makeField(text: cost, font: font, color: color,
+                                  x: costX, width: columns.costWidth, alignment: .right,
+                                  tooltipRows: tooltips?.cost)
+        costField.identifier = NSUserInterfaceItemIdentifier("usage.cost")
+        addSubview(costField)
     }
 
     override init(frame: NSRect) { super.init(frame: frame) }

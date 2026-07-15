@@ -302,6 +302,13 @@ final class OpenCodeUsageScannerTests: XCTestCase {
     }
 
     func testTooltipHoverFiresInsideMenuEventTrackingRunLoop() throws {
+        try requireInteractiveMenuSession()
+        let originalMouseLocation = try moveMouseToMainDisplayCenter()
+        defer {
+            if let originalMouseLocation {
+                CGWarpMouseCursorPosition(originalMouseLocation)
+            }
+        }
         _ = NSApplication.shared
         let tooltipRows = [
             MenuTooltipRow(name: "Claude Code", value: "100 Tok"),
@@ -342,7 +349,14 @@ final class OpenCodeUsageScannerTests: XCTestCase {
         XCTAssertTrue(presenter.isTooltipVisible)
     }
 
-    func testTooltipStaysVisibleInsideRealMenuTrackingSession() {
+    func testTooltipStaysVisibleInsideRealMenuTrackingSession() throws {
+        try requireInteractiveMenuSession()
+        let originalMouseLocation = try moveMouseToMainDisplayCenter()
+        defer {
+            if let originalMouseLocation {
+                CGWarpMouseCursorPosition(originalMouseLocation)
+            }
+        }
         _ = NSApplication.shared
         let rows = [
             MenuTooltipRow(name: "Claude Code", value: "100 Tok"),
@@ -358,12 +372,19 @@ final class OpenCodeUsageScannerTests: XCTestCase {
         let presenter = MenuTooltipPresenter.shared
         var tooltipWasVisible = false
         var menuWasStillVisible = false
-        let inspectTimer = Timer(timeInterval: 0.4, repeats: false) { _ in
-            tooltipWasVisible = presenter.isTooltipVisible
-            menuWasStillVisible = source.window?.isVisible == true
-            menu.cancelTracking()
+        let trackingObserver = NotificationCenter.default.addObserver(
+            forName: NSMenu.didBeginTrackingNotification,
+            object: menu,
+            queue: nil
+        ) { _ in
+            let inspectTimer = Timer(timeInterval: 0.4, repeats: false) { _ in
+                tooltipWasVisible = presenter.isTooltipVisible
+                menuWasStillVisible = source.window?.isVisible == true
+                menu.cancelTracking()
+            }
+            RunLoop.main.add(inspectTimer, forMode: .eventTracking)
         }
-        RunLoop.main.add(inspectTimer, forMode: .eventTracking)
+        defer { NotificationCenter.default.removeObserver(trackingObserver) }
 
         let mouse = NSEvent.mouseLocation
         menu.popUp(
@@ -379,6 +400,27 @@ final class OpenCodeUsageScannerTests: XCTestCase {
 
     private func daily(_ date: String, tokens: Int, cost: Double, messages: Int) -> DailyUsage {
         DailyUsage(date: date, tokens: tokens, costCNY: cost, messageCount: messages)
+    }
+
+    private func requireInteractiveMenuSession() throws {
+        try XCTSkipIf(
+            ProcessInfo.processInfo.environment["GITHUB_ACTIONS"] == "true",
+            "Requires an interactive WindowServer session for real menu tracking"
+        )
+    }
+
+    private func moveMouseToMainDisplayCenter() throws -> CGPoint? {
+        let originalLocation = CGEvent(source: nil)?.location
+        let displayBounds = CGDisplayBounds(CGMainDisplayID())
+        let result = CGWarpMouseCursorPosition(CGPoint(
+            x: displayBounds.midX,
+            y: displayBounds.midY
+        ))
+        try XCTSkipIf(
+            result != .success,
+            "Requires permission to position the cursor for menu hover testing"
+        )
+        return originalLocation
     }
 
     private func renderedValueRightEdges(in view: MenuSourceTooltipView) throws -> [Int] {

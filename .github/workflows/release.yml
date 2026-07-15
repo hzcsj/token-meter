@@ -1,0 +1,60 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+jobs:
+  package-release-assets:
+    runs-on: macos-15
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Validate tag and scripts
+        shell: bash
+        run: |
+          source scripts/app-config.sh
+          if [[ "$GITHUB_REF_NAME" != "v$APP_VERSION" ]]; then
+            echo "Tag $GITHUB_REF_NAME does not match configured version v$APP_VERSION" >&2
+            exit 1
+          fi
+          bash -n scripts/*.sh
+          test -f ".github/release-notes/$GITHUB_REF_NAME.md"
+
+      - name: Run tests
+        run: swift test
+
+      - name: Build universal app and archive
+        run: bash scripts/package.sh --arch universal --output-dir dist
+
+      - name: Create and verify checksums
+        shell: bash
+        run: |
+          source scripts/app-config.sh
+          archive="TokenMeter-v$APP_VERSION-macos-universal.zip"
+          cd dist
+          shasum -a 256 "$archive" > SHA256SUMS
+          shasum -a 256 -c SHA256SUMS
+          plutil -lint TokenMeter.app/Contents/Info.plist
+          test "$(plutil -extract CFBundleShortVersionString raw -o - TokenMeter.app/Contents/Info.plist)" = "$APP_VERSION"
+          test "$(plutil -extract CFBundleVersion raw -o - TokenMeter.app/Contents/Info.plist)" = "$APP_BUILD_VERSION"
+          test "$(plutil -extract CFBundleIdentifier raw -o - TokenMeter.app/Contents/Info.plist)" = "$APP_BUNDLE_ID"
+          test "$(plutil -extract CFBundleIconFile raw -o - TokenMeter.app/Contents/Info.plist)" = "AppIcon"
+          test -f TokenMeter.app/Contents/Resources/AppIcon.icns
+          archs="$(lipo -archs TokenMeter.app/Contents/MacOS/TokenMeter)"
+          [[ " $archs " == *" arm64 "* && " $archs " == *" x86_64 "* ]]
+
+      - name: Retain release build artifacts
+        uses: actions/upload-artifact@v7
+        with:
+          name: TokenMeter-${{ github.ref_name }}-release-assets
+          path: |
+            dist/TokenMeter-v*-macos-universal.zip
+            dist/SHA256SUMS
+          if-no-files-found: error
+          retention-days: 14

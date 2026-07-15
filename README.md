@@ -1,77 +1,133 @@
-# TokenMeter
+<p align="center">
+  <img src="Resources/AppIcon.png" width="160" alt="TokenMeter app icon">
+</p>
 
-A macOS menu bar app that tracks local token usage and costs for AI coding tools.
+<h1 align="center">TokenMeter</h1>
+
+<p align="center">
+  A native macOS menu bar app for tracking local AI coding token usage, estimated cost, and Codex quotas.
+</p>
+
+TokenMeter gives Claude Code, Codex, and OpenCode users one lightweight view of their local usage. It runs without a Dock icon, refreshes automatically, and keeps usage processing on the Mac.
 
 ## Features
 
-- **Claude Code usage tracking** — Scans `~/.claude/projects/**/*.jsonl` for token consumption
-- **Codex usage tracking** — Scans `~/.codex/sessions/**/*.jsonl` for token consumption, supplemented by `~/.codex/logs_2.sqlite` for side/temporary chat sessions not present in JSONL (tokens exact, cost estimated via daily effective-rate)
-- **OpenCode usage tracking** — Reads assistant usage from `~/.local/share/opencode/opencode.db`, including live WAL data, through a read-only SQLite connection
-- **Codex quota monitoring** — Displays 5H/7D rolling window quota remaining
-- **Multi-model pricing** — Supports Claude, GPT, Qwen, GLM, DeepSeek with per-model cost calculation
-- **Dual currency** — USD models auto-converted to CNY; CNY-native models priced directly
-- **Incremental scanning** — mtime+size based cache for fast refreshes
-- **Daily breakdown** — Token count, message count, and cost per day (recent 7 days + weekly/monthly/all-time totals)
-- **Per-source hover details** — When at least two sources have calls, hover Token, call-count, or cost fields for a rounded, shadowed breakdown of active sources and the combined total; single-source rows stay tooltip-free
+- Tracks Claude Code usage from local JSONL session logs.
+- Tracks Codex usage and model-aware estimated cost from local sessions, including side and temporary chats found only in the local SQLite log database.
+- Reads OpenCode assistant usage from its local SQLite database, including live WAL data.
+- Shows Codex rolling quota windows and reset timing.
+- Aggregates daily, weekly, monthly, and all-time token counts, calls, and cost.
+- Breaks down mixed-source totals in field-level hover details.
+- Uses incremental caches for quick refreshes after the first scan.
+- Supports USD and CNY price tables through `Resources/pricing.json`.
 
-Token-field tooltip example (active sources only):
+## Requirements and compatibility
 
-```text
-Claude Code     152M Tok
-OpenCode       55.9M Tok
-────────────────────────
-合计             208M Tok
-```
+| Requirement | Support |
+| --- | --- |
+| macOS | macOS 13 Ventura or later |
+| GitHub Release CPU support | Universal binary: Apple Silicon (`arm64`) and Intel (`x86_64`) |
+| Source build tools | Xcode Command Line Tools with Swift 5.9 or later |
 
-## Requirements
+TokenMeter is a menu bar app (`LSUIElement`) and does not show a Dock icon.
 
-- macOS 13.0+
-- Swift 5.9+
+## Install
 
-## Build & Install
+### 1. Download from GitHub Releases
+
+1. Open the [TokenMeter Releases page](https://github.com/hzcsj/token-meter/releases).
+2. Download `TokenMeter-v0.1.0-macos-universal.zip` and `SHA256SUMS`.
+3. Optionally verify the download from the directory containing both files:
+
+   ```bash
+   shasum -a 256 -c SHA256SUMS
+   ```
+
+4. Unzip the archive and move `TokenMeter.app` to `/Applications`.
+5. Open TokenMeter. To launch it automatically after login, add it under System Settings → General → Login Items.
+
+See [Signing, notarization, and Gatekeeper](#signing-notarization-and-gatekeeper) before the first launch.
+
+### 2. Build and install from source
 
 ```bash
-# Build
-swift build -c release
-
-# Install (builds, creates .app, sets up LaunchAgent)
+git clone https://github.com/hzcsj/token-meter.git
+cd token-meter
 bash scripts/install.sh
 ```
 
-## How It Works
+The source installer builds for the current Mac architecture, installs `/Applications/TokenMeter.app`, and creates the `io.github.hzcsj.tokenmeter` LaunchAgent. Upgrading through this installer also removes the legacy `com.user.tokenmeter` LaunchAgent to prevent duplicate processes.
 
-TokenMeter runs as a menu bar app (no Dock icon). Every 5 minutes it:
+To create a release bundle without installing anything or changing `launchctl` state:
 
-1. Scans Claude Code JSONL logs for assistant messages with token usage
-2. Scans Codex JSONL logs for token_count events and rate_limit quota data; supplements with logs_2.sqlite for logs-only side/temporary chats (deduplicated by JSONL thread IDs)
-3. Scans OpenCode assistant messages from its local SQLite database using `mode=ro` (no checkpoint or database mutation)
-4. Calculates cost using `pricing.json` (per-model pricing, supports USD and CNY)
-5. Renders today's token count + cost in the menu bar
-6. Shows a dropdown with daily breakdown, weekly/monthly totals, and Codex quota status
+```bash
+bash scripts/package.sh --arch universal --output-dir dist
+```
 
-Set `OPENCODE_DB_PATH` to override the default OpenCode database path. The scanner does not use `immutable=1` or a main-file-only mtime cache, so uncheckpointed WAL records remain visible. Corrupt rows and unavailable or incompatible databases are skipped without affecting Claude Code or Codex statistics.
+This produces `dist/TokenMeter.app` and `dist/TokenMeter-v0.1.0-macos-universal.zip` without writing to `/Applications`.
+
+## Signing, notarization, and Gatekeeper
+
+The v0.1.0 public artifacts are **not signed with an Apple Developer ID and are not notarized by Apple**. Gatekeeper may therefore block the first launch of a downloaded build.
+
+Do not disable Gatekeeper globally. In Finder, Control-click `TokenMeter.app`, choose **Open**, then confirm **Open**. If macOS still blocks the app, review it under System Settings → Privacy & Security.
+
+## Privacy
+
+TokenMeter scans supported logs and databases locally and read-only:
+
+- Claude Code and Codex JSONL logs are opened for local parsing only.
+- Codex and OpenCode SQLite databases are opened in read-only mode; TokenMeter does not checkpoint or mutate their WAL files.
+- Token usage, prompts, logs, and derived cost data are not uploaded by TokenMeter.
+- The incremental usage cache remains local under `~/Library/Caches/token-meter/`.
+
+The app contains no telemetry or analytics service. Its bundled pricing table is local.
+
+## How it works
+
+Every five minutes TokenMeter:
+
+1. Scans Claude Code assistant messages in `~/.claude/projects/**/*.jsonl`.
+2. Scans Codex sessions in `~/.codex/sessions/**/*.jsonl` and supplements them with deduplicated side or temporary chats from `~/.codex/logs_2.sqlite`.
+3. Reads OpenCode assistant messages from `~/.local/share/opencode/opencode.db` using a read-only SQLite connection.
+4. Calculates virtual cost using the bundled pricing table.
+5. Updates the menu bar summary, detailed history, and Codex quota windows.
+
+Set `OPENCODE_DB_PATH` to override the default OpenCode database location. Missing, corrupt, or incompatible rows are skipped without preventing the other sources from loading.
 
 ## Pricing
 
-Model prices are defined in `Resources/pricing.json`. To add a new model, add an entry to the appropriate section:
+Model prices are defined in `Resources/pricing.json`:
 
-- `models_usd_per_mtok` — For Claude Code models (USD per million tokens)
-- `codex_models_usd_per_mtok` — For Codex/GPT models (USD per million tokens)
-- `long_context_threshold` / `long_*` — Optional Codex long-context rates (GPT-5.6/5.5/5.4 use the official 272K threshold)
+- `models_usd_per_mtok` contains Claude and other USD-denominated model rates.
+- `codex_models_usd_per_mtok` contains Codex/GPT rates.
+- `long_context_threshold` and `long_*` contain optional long-context rates.
 
-Models with `"currency": "CNY"` are priced directly in CNY.
-Virtual costs use official standard list prices; temporary promotions, Batch, and Flex discounts are intentionally ignored.
-Models whose names contain `dogfooding` (case-insensitive) remain free for every source: tokens and assistant calls are counted, while virtual cost is zero.
+Virtual costs use standard list prices and intentionally exclude temporary promotions, Batch, and Flex discounts. Models whose names contain `dogfooding` are counted but remain free.
+
+## Development
+
+```bash
+swift test
+swift build -c release
+bash -n scripts/*.sh
+```
+
+Release metadata is centralized in `scripts/app-config.sh`. A Git tag must match the configured app version before the release workflow packages and retains its release assets. Publishing the public GitHub Release remains a separate, explicit step.
 
 ## Uninstall
 
 ```bash
-launchctl unload ~/Library/LaunchAgents/com.user.tokenmeter.plist
-rm ~/Library/LaunchAgents/com.user.tokenmeter.plist
+launchctl unload ~/Library/LaunchAgents/io.github.hzcsj.tokenmeter.plist 2>/dev/null || true
+rm -f ~/Library/LaunchAgents/io.github.hzcsj.tokenmeter.plist
 rm -rf /Applications/TokenMeter.app
 rm -rf ~/Library/Caches/token-meter/
+
+# Legacy pre-v0.1.0 LaunchAgent cleanup, if still present
+launchctl unload ~/Library/LaunchAgents/com.user.tokenmeter.plist 2>/dev/null || true
+rm -f ~/Library/LaunchAgents/com.user.tokenmeter.plist
 ```
 
 ## License
 
-MIT
+[MIT](LICENSE)

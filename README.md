@@ -36,7 +36,7 @@ TokenMeter is a menu bar app (`LSUIElement`) and does not show a Dock icon.
 ### 1. Download from GitHub Releases
 
 1. Open the [TokenMeter Releases page](https://github.com/hzcsj/token-meter/releases).
-2. Download `TokenMeter-v0.1.0-macos-universal.zip` and `SHA256SUMS`.
+2. Download `TokenMeter-v0.2.0-macos-universal.zip` and `SHA256SUMS`.
 3. Optionally verify the download from the directory containing both files:
 
    ```bash
@@ -44,7 +44,7 @@ TokenMeter is a menu bar app (`LSUIElement`) and does not show a Dock icon.
    ```
 
 4. Unzip the archive and move `TokenMeter.app` to `/Applications`.
-5. Open TokenMeter. To launch it automatically after login, add it under System Settings → General → Login Items.
+5. Open TokenMeter. Use **设置与退出…** to control **随系统启动**, or quit with `⌘Q`.
 
 See [Signing, notarization, and Gatekeeper](#signing-notarization-and-gatekeeper) before the first launch.
 
@@ -56,7 +56,7 @@ cd token-meter
 bash scripts/install.sh
 ```
 
-The source installer builds for the current Mac architecture, installs `/Applications/TokenMeter.app`, and creates the `io.github.hzcsj.tokenmeter` LaunchAgent. Upgrading through this installer also removes the legacy `com.user.tokenmeter` LaunchAgent to prevent duplicate processes.
+The source installer builds for the current Mac architecture, installs `/Applications/TokenMeter.app`, and creates the `io.github.hzcsj.tokenmeter` LaunchAgent. First installs enable login start by default. Later installer runs preserve an explicit disabled choice made in the app. Upgrading also removes the legacy `com.user.tokenmeter` LaunchAgent to prevent duplicate processes.
 
 To create a release bundle without installing anything or changing `launchctl` state:
 

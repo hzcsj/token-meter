@@ -6,6 +6,12 @@ final class StatusBarManager: NSObject, NSMenuDelegate {
     private var statusItem: NSStatusItem!
     private let titleRenderer = TitleRenderer()
     private let menuBuilder = MenuBuilder()
+    private let menuRenderGate = MenuRenderGate()
+    private let loginItemManager: LoginItemManager
+    private lazy var settingsMenuController = SettingsMenuController(
+        appName: "TokenMeter",
+        loginItemManager: loginItemManager
+    )
 
     private let claudeScanner = ClaudeUsageScanner()
     private let codexScanner = CodexUsageScanner()
@@ -24,10 +30,26 @@ final class StatusBarManager: NSObject, NSMenuDelegate {
     private var lastRefreshAt: Date = .distantPast
 
     private override init() {
+        let executableURL = Bundle.main.executableURL
+            ?? URL(fileURLWithPath: CommandLine.arguments[0])
+        loginItemManager = LoginItemManager(
+            configuration: LoginItemConfiguration(
+                label: "io.github.hzcsj.tokenmeter",
+                legacyLabels: ["com.user.tokenmeter"],
+                executableURL: executableURL
+            )
+        )
         super.init()
     }
 
     func start() {
+        do {
+            try loginItemManager.reconcileLegacyRegistrations()
+        } catch {
+            print("LaunchAgent migration failed: \(error.localizedDescription)")
+        }
+        _ = settingsMenuController
+
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
 
         guard statusItem.button != nil else {
@@ -50,7 +72,14 @@ final class StatusBarManager: NSObject, NSMenuDelegate {
     // MARK: - NSMenuDelegate
 
     func menuWillOpen(_ menu: NSMenu) {
+        menuRenderGate.menuWillOpen()
         refreshIfNeeded(force: false)
+    }
+
+    func menuDidClose(_ menu: NSMenu) {
+        if menuRenderGate.menuDidClose() {
+            renderUI()
+        }
     }
 
     // MARK: - Private
@@ -85,6 +114,7 @@ final class StatusBarManager: NSObject, NSMenuDelegate {
     }
 
     private func renderUI() {
+        guard menuRenderGate.requestRender() else { return }
         guard let button = statusItem.button else { return }
 
         let mergedUsage = menuBuilder.mergeUsage([
@@ -104,11 +134,13 @@ final class StatusBarManager: NSObject, NSMenuDelegate {
         button.image = image
         button.imagePosition = .imageLeft
 
+        let settingsMenuItem = settingsMenuController.makeParentMenuItem()
         let menu = menuBuilder.build(
             claudeUsage: currentClaudeUsage,
             codexUsage: currentCodexUsage,
             openCodeUsage: currentOpenCodeUsage,
-            codexQuota: currentCodexQuota
+            codexQuota: currentCodexQuota,
+            settingsMenuItem: settingsMenuItem
         )
 
         menu.delegate = self

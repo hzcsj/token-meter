@@ -41,7 +41,8 @@ struct MenuBuilder {
         claudeUsage: UsageSummary?,
         codexUsage: UsageSummary?,
         openCodeUsage: UsageSummary?,
-        codexQuota: CodexQuota?
+        codexQuota: CodexQuota?,
+        settingsMenuItem: NSMenuItem? = nil
     ) -> NSMenu {
         let menu = NSMenu()
         menu.autoenablesItems = false
@@ -64,6 +65,11 @@ struct MenuBuilder {
 
         if let usage = mergedUsage {
             addLocalUsageSection(usage, sources: sourceSummaries, to: menu, columns: columns!)
+        }
+
+        if let settingsMenuItem {
+            menu.addItem(NSMenuItem.separator())
+            menu.addItem(settingsMenuItem)
         }
 
         addVerticalPadding(to: menu)

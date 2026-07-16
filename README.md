@@ -36,7 +36,7 @@ TokenMeter is a menu bar app (`LSUIElement`) and does not show a Dock icon.
 ### 1. Download from GitHub Releases
 
 1. Open the [TokenMeter Releases page](https://github.com/hzcsj/token-meter/releases).
-2. Download `TokenMeter-v0.2.0-macos-universal.zip` and `SHA256SUMS`.
+2. Download `TokenMeter-v0.2.1-macos-universal.zip` and `SHA256SUMS`.
 3. Optionally verify the download from the directory containing both files:
 
    ```bash

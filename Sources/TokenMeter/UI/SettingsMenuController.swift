@@ -131,6 +131,10 @@ final class SettingsMenuController: NSObject, NSMenuDelegate {
     }
 
     func makeParentMenuItem() -> NSMenuItem {
+        if let previousMenu = submenu.supermenu,
+           let previousParent = previousMenu.items.first(where: { $0.submenu === submenu }) {
+            previousParent.submenu = nil
+        }
         let item = NSMenuItem(title: Self.parentTitle, action: nil, keyEquivalent: "")
         item.isEnabled = true
         item.submenu = submenu

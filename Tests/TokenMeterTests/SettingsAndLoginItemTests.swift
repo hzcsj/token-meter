@@ -78,6 +78,28 @@ final class SettingsAndLoginItemTests: XCTestCase {
         XCTAssertNotNil(parent.submenu)
     }
 
+    func testRepeatedParentCreationMovesSharedSubmenuToLatestMenu() throws {
+        _ = NSApplication.shared
+        let controller = SettingsMenuController(
+            appName: "TokenMeter",
+            loginItemManager: FakeLoginItemManager(enabled: true),
+            errorReporter: { _ in XCTFail("Unexpected error") }
+        )
+        let firstMenu = NSMenu()
+        let firstParent = controller.makeParentMenuItem()
+        let submenu = try XCTUnwrap(firstParent.submenu)
+        firstMenu.addItem(firstParent)
+        XCTAssertTrue(submenu.supermenu === firstMenu)
+
+        let secondParent = controller.makeParentMenuItem()
+        let secondMenu = NSMenu()
+        secondMenu.addItem(secondParent)
+
+        XCTAssertNil(firstParent.submenu)
+        XCTAssertTrue(secondParent.submenu === submenu)
+        XCTAssertTrue(submenu.supermenu === secondMenu)
+    }
+
     func testSecondaryMenuUsesFixedItemsToggleViewAndCommandQ() throws {
         _ = NSApplication.shared
         let loginItems = FakeLoginItemManager(enabled: true)

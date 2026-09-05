@@ -2,7 +2,7 @@ import Foundation
 
 struct ClaudeUsageScanner {
     private let projectsDir: URL
-    private let cache = IncrementalCache<[UsageRecord]>(name: "claude_usage_v2")
+    private let cache = IncrementalCache<[UsageRecord]>(name: "claude_usage_v4_\(PricingEngine.shared.cacheKey)")
 
     init() {
         let home = FileManager.default.homeDirectoryForCurrentUser
@@ -119,7 +119,7 @@ struct ClaudeUsageScanner {
                     cacheRead: cacheRead
                 )
 
-                let costCNY = PricingEngine.shared.calculateCNY(usage: tokenUsage, model: model)
+                let costCNY = PricingEngine.shared.calculateCNY(usage: tokenUsage, model: model, at: timestamp)
 
                 let record = UsageRecord(
                     messageId: messageId,

@@ -95,7 +95,7 @@ struct OpenCodeUsageScanner {
                 timestamp: timestamp,
                 model: model,
                 tokens: tokenUsage,
-                costCNY: PricingEngine.shared.calculateCNY(usage: tokenUsage, model: model),
+                costCNY: PricingEngine.shared.calculateCNY(usage: tokenUsage, model: model, at: timestamp),
                 source: .opencode
             ))
             seenMessageIds.insert(messageId)

@@ -99,11 +99,25 @@ Set `OPENCODE_DB_PATH` to override the default OpenCode database location. Missi
 
 Model prices are defined in `Resources/pricing.json`:
 
-- `models_usd_per_mtok` contains Claude and other USD-denominated model rates.
+- `models_usd_per_mtok` contains Claude, Gemini, Qwen, GLM, DeepSeek, and other model rates; CNY entries declare `currency: "CNY"`.
 - `codex_models_usd_per_mtok` contains Codex/GPT rates.
 - `long_context_threshold` and `long_*` contain optional long-context rates.
+- `cache_write` and `service_tier_multipliers` describe Codex cache writes and per-model `fast`/`priority` rates.
 
-Virtual costs use standard list prices and intentionally exclude temporary promotions, Batch, and Flex discounts. Models whose names contain `dogfooding` are counted but remain free.
+Virtual costs use official on-demand API rates, including publicly advertised model-wide pricing such as the GPT-5.6 Sol promotion (available at least through November 21, 2026; no automatic expiry is assumed). Batch/Flex discounts, regional uplifts, and time-based cache-storage charges are excluded. Sonnet 5 remains $2/$10 per million input/output tokens; its planned September increase was canceled. Models whose names contain `dogfooding` are counted but remain free.
+
+The September 5, 2026 catalog adds GPT-6 Astra and Claude Fable/Mythos 5.1. GPT-6 Astra costs $10 input / $1 cache read / $12.50 cache write / $50 output per million tokens, with long-context rates above 272K input tokens and 2× API Fast/Priority rates. Fable/Mythos 5.1 cost $10 input / $50 output with $0.25 cache reads; their 5m/1h cache-write rates remain $12.50/$20. Sources: [OpenAI pricing](https://developers.openai.com/api/docs/pricing), [OpenAI changelog](https://developers.openai.com/api/docs/changelog), and [Anthropic pricing](https://platform.claude.com/docs/en/about-claude/pricing).
+
+### Historical pricing
+
+`price_history` stores prior rates with exclusive `effective_until` cutoffs. Claude, Codex, and OpenCode pass each usage record's timestamp to the pricing engine; the earliest matching cutoff is selected after resolving the exact model or longest variant prefix. Only models listed in a revision are overridden, so a new model never inherits an unrelated old fallback.
+
+- Terra/Luna retain prior prices before July 30, 2026.
+- Sol (including the `gpt-5.6` alias) retains $5/$30 before August 21, then uses $4/$20.
+- From July 30, GPT-5.6 `fast` and `priority` both use 2× API rates. Earlier catalog estimates are retained.
+- Official announcements specify dates without an exact time; cutoffs use 00:00 UTC (08:00 Asia/Shanghai).
+
+When updating an existing price, append a dated revision containing the **complete previous rate entry** before editing the current table; never overwrite earlier revisions. The catalog fingerprint automatically invalidates cost caches. A rebuild uses event-time prices, not today's prices for all records. Existing cache files are left intact. Earlier unverified price history retains the previous catalog baseline; correcting a missing model or a counting bug can still change past estimates. These are virtual API-equivalent costs, not subscription bills. Provider-specific verification dates are recorded in `_meta.provider_last_verified`.
 
 ## Development
 

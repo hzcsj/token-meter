@@ -44,7 +44,7 @@ func resolveCodexQuota(
 
 struct CodexUsageScanner {
     private let codexDir: URL
-    private let cache = IncrementalCache<CodexFileScanResult>(name: "codex_usage_v4")
+    private let cache = IncrementalCache<CodexFileScanResult>(name: "codex_usage_v6_\(PricingEngine.shared.cacheKey)")
 
     init() {
         let home = FileManager.default.homeDirectoryForCurrentUser
@@ -218,9 +218,11 @@ struct CodexUsageScanner {
 
                     let input = lastUsage["input_tokens"] as? Int ?? 0
                     let cachedInput = lastUsage["cached_input_tokens"] as? Int ?? 0
+                    let cacheWriteInput = lastUsage["cache_write_input_tokens"] as? Int ?? 0
                     let output = lastUsage["output_tokens"] as? Int ?? 0
                     let reasoning = lastUsage["reasoning_output_tokens"] as? Int ?? 0
-                    let total = lastUsage["total_tokens"] as? Int ?? (input + output + reasoning)
+                    // Codex output_tokens already includes reasoning_output_tokens.
+                    let total = lastUsage["total_tokens"] as? Int ?? (input + output)
 
                     let tokenUsage = UsageRecord.TokenUsage(
                         input: total,
@@ -233,10 +235,12 @@ struct CodexUsageScanner {
                     let costCNY = PricingEngine.shared.calculateCodexCNY(
                         input: input,
                         cachedInput: cachedInput,
+                        cacheWriteInput: cacheWriteInput,
                         output: output,
                         reasoning: reasoning,
                         model: currentModel,
-                        serviceTier: currentServiceTier
+                        serviceTier: currentServiceTier,
+                        at: timestamp
                     )
 
                     let record = UsageRecord(

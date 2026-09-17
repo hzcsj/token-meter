@@ -34,12 +34,8 @@ func resolveCodexQuota(
         )
     }
 
-    guard let untrusted, !untrusted.windows.isEmpty else { return nil }
-    return CodexQuota(
-        planType: untrusted.planType,
-        model: untrusted.model,
-        windows: untrusted.windows
-    )
+    // An auxiliary bucket is a separate allowance, not a fresher main quota.
+    return nil
 }
 
 struct CodexUsageScanner {

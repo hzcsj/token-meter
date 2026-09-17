@@ -16,10 +16,13 @@ final class StatusBarManager: NSObject, NSMenuDelegate {
     private let claudeScanner = ClaudeUsageScanner()
     private let codexScanner = CodexUsageScanner()
     private let openCodeScanner = OpenCodeUsageScanner()
+    private let codexQuotaService = CodexQuotaService()
+    private var liveCodexQuota: CodexQuotaReadResult = .unavailable
 
     private let refreshInterval: TimeInterval = 300
     private let refreshDebounce: TimeInterval = 5
     private var timer: Timer?
+    private var quotaTimer: Timer?
 
     private var currentClaudeUsage: UsageSummary?
     private var currentCodexUsage: UsageSummary?
@@ -58,10 +61,17 @@ final class StatusBarManager: NSObject, NSMenuDelegate {
         }
 
         refreshIfNeeded(force: true)
+        refreshQuota()
 
         timer = Timer.scheduledTimer(withTimeInterval: refreshInterval, repeats: true) { [weak self] _ in
             self?.refreshIfNeeded(force: false)
         }
+        quotaTimer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in
+            self?.refreshQuota()
+        }
+        NSWorkspace.shared.notificationCenter.addObserver(
+            self, selector: #selector(refreshQuota), name: NSWorkspace.didWakeNotification, object: nil
+        )
     }
 
     @objc func openURL(_ sender: NSMenuItem) {
@@ -74,6 +84,7 @@ final class StatusBarManager: NSObject, NSMenuDelegate {
     func menuWillOpen(_ menu: NSMenu) {
         menuRenderGate.menuWillOpen()
         refreshIfNeeded(force: false)
+        refreshQuota()
     }
 
     func menuDidClose(_ menu: NSMenu) {
@@ -83,6 +94,16 @@ final class StatusBarManager: NSObject, NSMenuDelegate {
     }
 
     // MARK: - Private
+
+    @objc private func refreshQuota() {
+        Task {
+            let result = await codexQuotaService.refresh()
+            await MainActor.run {
+                liveCodexQuota = result
+                renderUI()
+            }
+        }
+    }
 
     private func refreshIfNeeded(force: Bool) {
         if !force && Date().timeIntervalSince(lastRefreshAt) < refreshDebounce {
@@ -101,12 +122,11 @@ final class StatusBarManager: NSObject, NSMenuDelegate {
         let (codexUsage, codexQuota) = codexScanner.scan()
         let openCodeUsage = openCodeScanner.scan()
 
-        currentClaudeUsage = claudeUsage
-        currentCodexUsage = codexUsage
-        currentOpenCodeUsage = openCodeUsage
-        currentCodexQuota = codexQuota
-
         await MainActor.run {
+            currentClaudeUsage = claudeUsage
+            currentCodexUsage = codexUsage
+            currentOpenCodeUsage = openCodeUsage
+            currentCodexQuota = codexQuota
             lastRefreshAt = Date()
             isRefreshing = false
             renderUI()
@@ -139,7 +159,7 @@ final class StatusBarManager: NSObject, NSMenuDelegate {
             claudeUsage: currentClaudeUsage,
             codexUsage: currentCodexUsage,
             openCodeUsage: currentOpenCodeUsage,
-            codexQuota: currentCodexQuota,
+            codexQuota: displayedCodexQuota(live: liveCodexQuota, local: currentCodexQuota),
             settingsMenuItem: settingsMenuItem
         )
 

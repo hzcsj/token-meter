@@ -124,15 +124,10 @@ struct CodexQuota: Codable, Equatable {
 
         var displayData: (remainingPercent: Double, countdown: String, timePercent: Double) {
             let now = Date()
-            var currentResetsAt = resetsAt
-            var currentRemainingPercent = remainingPercent
-            let windowSeconds = Double(windowMinutes * 60)
-
-            if currentResetsAt <= now && windowSeconds > 0 {
-                let periods = Int((now.timeIntervalSince(currentResetsAt) / windowSeconds).rounded(.down)) + 1
-                currentResetsAt = currentResetsAt.addingTimeInterval(Double(periods) * windowSeconds)
-                currentRemainingPercent = 100.0
-            }
+            // A passed reset time is not evidence of a new 100% allowance.
+            guard resetsAt > now else { return (remainingPercent, "已重置", 0) }
+            let currentResetsAt = resetsAt
+            let currentRemainingPercent = remainingPercent
 
             let interval = currentResetsAt.timeIntervalSince(now)
             let hours = Int(interval) / 3600

@@ -166,15 +166,14 @@ final class CodexQuotaTests: XCTestCase {
         XCTAssertNil(resolveCodexQuota(trusted: trusted, untrusted: untrusted))
     }
 
-    func testUntrustedWindowsRemainFallbackWhenTrustedIsMissing() {
+    func testUntrustedWindowsNeverReplaceMissingMainQuota() {
         let untrusted = makeSnapshot(
             windows: [makeWindow(windowMinutes: 10080)],
             isTrusted: false
         )
 
         let quota = resolveCodexQuota(trusted: nil, untrusted: untrusted)
-        XCTAssertEqual(quota?.windows.count, 1)
-        XCTAssertEqual(quota?.windows.first?.displayLabel, "7D")
+        XCTAssertNil(quota)
     }
 
     // MARK: - Unknown window period
@@ -222,9 +221,9 @@ final class CodexQuotaTests: XCTestCase {
         XCTAssertEqual(decoded, quota)
     }
 
-    // MARK: - Display Data: expired window rolls forward
+    // MARK: - Display Data: expiration cannot invent a fresh allowance
 
-    func testExpiredWindowRollsForward() {
+    func testExpiredWindowRetainsLastObservedRemainingQuota() {
         let pastResets = Date().addingTimeInterval(-3600)
         let w = CodexQuota.Window(
             sourceSlot: "primary",
@@ -233,8 +232,9 @@ final class CodexQuotaTests: XCTestCase {
             resetsAt: pastResets
         )
         let display = w.displayData
-        XCTAssertEqual(display.remainingPercent, 100.0, accuracy: 0.01)
-        XCTAssertFalse(display.countdown.contains("已重置"))
+        XCTAssertEqual(display.remainingPercent, 50.0, accuracy: 0.01)
+        XCTAssertEqual(display.countdown, "已重置")
+        XCTAssertEqual(display.timePercent, 0)
     }
 
     // MARK: - Helpers

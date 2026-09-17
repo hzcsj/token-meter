@@ -15,7 +15,7 @@ TokenMeter gives Claude Code, Codex, and OpenCode users one lightweight view of 
 - Tracks Claude Code usage from local JSONL session logs.
 - Tracks Codex usage and model-aware estimated cost from local sessions, including side and temporary chats found only in the local SQLite log database.
 - Reads OpenCode assistant usage from its local SQLite database, including live WAL data.
-- Shows Codex rolling quota windows and reset timing.
+- Refreshes the official Codex main quota every minute, independently of conversation completion, with separate quota windows and reset timing.
 - Aggregates daily, weekly, monthly, and all-time token counts, calls, and cost.
 - Breaks down mixed-source totals in field-level hover details.
 - Uses incremental caches for quick refreshes after the first scan.
@@ -36,7 +36,7 @@ TokenMeter is a menu bar app (`LSUIElement`) and does not show a Dock icon.
 ### 1. Download from GitHub Releases
 
 1. Open the [TokenMeter Releases page](https://github.com/hzcsj/token-meter/releases).
-2. Download `TokenMeter-v0.2.1-macos-universal.zip` and `SHA256SUMS`.
+2. Download `TokenMeter-v0.2.3-macos-universal.zip` and `SHA256SUMS`.
 3. Optionally verify the download from the directory containing both files:
 
    ```bash
@@ -64,7 +64,7 @@ To create a release bundle without installing anything or changing `launchctl` s
 bash scripts/package.sh --arch universal --output-dir dist
 ```
 
-This produces `dist/TokenMeter.app` and `dist/TokenMeter-v0.1.0-macos-universal.zip` without writing to `/Applications`.
+This produces `dist/TokenMeter.app` and `dist/TokenMeter-v0.2.3-macos-universal.zip` without writing to `/Applications`.
 
 ## Signing, notarization, and Gatekeeper
 
@@ -80,6 +80,7 @@ TokenMeter scans supported logs and databases locally and read-only:
 - Codex and OpenCode SQLite databases are opened in read-only mode; TokenMeter does not checkpoint or mutate their WAL files.
 - Token usage, prompts, logs, and derived cost data are not uploaded by TokenMeter.
 - The incremental usage cache remains local under `~/Library/Caches/token-meter/`.
+- Quota refresh delegates to the installed official Codex app-server using its existing authentication. TokenMeter never reads credential files, starts a login flow, or stores account identifiers. The official client contacts its account service; only quota values are cached locally.
 
 The app contains no telemetry or analytics service. Its bundled pricing table is local.
 
@@ -94,6 +95,8 @@ Every five minutes TokenMeter:
 5. Updates the menu bar summary, detailed history, and Codex quota windows.
 
 Set `OPENCODE_DB_PATH` to override the default OpenCode database location. Missing, corrupt, or incompatible rows are skipped without preventing the other sources from loading.
+
+Codex quotas refresh separately every minute and on wake/menu open (debounced to 30 seconds), using the installed Codex/ChatGPT desktop app or Codex CLI. Only the official `codex` bucket is selected; auxiliary/Spark buckets cannot replace it. Network failures retain the last successful quota, with local records as the initial fallback. Signed-out, API-key-only, and free accounts show usage without quotas or login prompts. Local usage tracking does not require Codex authentication or a subscription.
 
 ## Pricing
 

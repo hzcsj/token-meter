@@ -92,6 +92,73 @@ final class PricingHistoryTests: XCTestCase {
         XCTAssertEqual(PricingEngine.shared.calculateCNY(usage: usage, model: "claude-fable-5-1"), 1.75, accuracy: 0.000_001)
     }
 
+    func testOpus55UsesOwnRatesWithoutChangingOpus5() throws {
+        let pricing = try catalog()
+        for model in ["claude-opus-5-5", "claude-opus-5-5[1m]", "claude-opus-5-5-20260922"] {
+            let price = pricing.findModelPrice(model, at: date("2026-09-22T00:00:00Z"))
+            XCTAssertEqual(price.input, 4)
+            XCTAssertEqual(price.output, 20)
+            XCTAssertEqual(price.cacheRead, 0.2)
+            XCTAssertEqual(price.cacheWrite5m, 5)
+            XCTAssertEqual(price.cacheWrite1h, 8)
+            XCTAssertEqual(price.effectiveRates(inputTokens: 900_000).input, 4)
+        }
+        for at in ["2026-07-25T00:00:00Z", "2026-09-23T00:00:00Z"] {
+            let old = pricing.findModelPrice("claude-opus-5", at: date(at))
+            XCTAssertEqual(old.input, 5)
+            XCTAssertEqual(old.output, 25)
+            XCTAssertEqual(old.cacheRead, 0.5)
+        }
+        let usage = UsageRecord.TokenUsage(input: 100_000, output: 10_000,
+            cacheWrite5m: 20_000, cacheWrite1h: 10_000, cacheRead: 200_000)
+        XCTAssertEqual(PricingEngine.shared.calculateCNY(usage: usage, model: "claude-opus-5-5"), 5.74, accuracy: 0.000_001)
+    }
+
+    func testGPT6SolAndLunaInBothCatalogsAndContextBoundaries() throws {
+        let pricing = try catalog()
+        for (model, input, output, cached, write) in [
+            ("gpt-6-sol", 2.0, 10.0, 0.2, 2.5),
+            ("gpt-6-luna", 0.1, 0.5, 0.01, 0.125),
+        ] {
+            for variant in [model, model + "-2026-09-22", model + "[1m]"] {
+                let codex = pricing.findCodexModelPrice(variant, at: date("2026-09-22T00:00:00Z"))
+                let generic = pricing.findModelPrice(variant)
+                XCTAssertEqual(codex.input, input)
+                XCTAssertEqual(codex.output, output)
+                XCTAssertEqual(codex.cachedInput, cached)
+                XCTAssertEqual(codex.cacheWrite, write)
+                XCTAssertEqual(generic.input, input)
+                XCTAssertEqual(generic.output, output)
+                XCTAssertEqual(generic.cacheRead, cached)
+                XCTAssertEqual(generic.cacheWrite5m, write)
+                XCTAssertEqual(generic.cacheWrite1h, write)
+                XCTAssertEqual(codex.effectiveRates(inputTokens: 272_000).input, input)
+                XCTAssertEqual(generic.effectiveRates(inputTokens: 272_000).input, input)
+                let long = codex.effectiveRates(inputTokens: 272_001)
+                XCTAssertEqual(long.input, input * 2)
+                XCTAssertEqual(long.output, output * 1.5)
+                XCTAssertEqual(long.cachedInput, cached * 2)
+                XCTAssertEqual(long.cacheWrite, write * 2)
+                XCTAssertEqual(generic.effectiveRates(inputTokens: 272_001).cacheRead, cached * 2)
+                XCTAssertEqual(generic.effectiveRates(inputTokens: 272_001).output, output * 1.5)
+                XCTAssertEqual(codex.serviceTierMultiplier("FAST"), 2)
+                XCTAssertEqual(codex.serviceTierMultiplier("priority"), 2)
+                XCTAssertEqual(codex.serviceTierMultiplier("default"), 1)
+            }
+        }
+    }
+
+    func testNewGPT6CostsIncludeAllTokenPartitions() {
+        for (model, short, long) in [("gpt-6-sol", 3.332, 7.63), ("gpt-6-luna", 0.1666, 0.3815)] {
+            XCTAssertEqual(PricingEngine.shared.calculateCodexCNY(input: 100_000, cachedInput: 40_000,
+                cacheWriteInput: 20_000, output: 10_000, reasoning: 5_000,
+                model: model, serviceTier: "fast"), short, accuracy: 0.000_001)
+            XCTAssertEqual(PricingEngine.shared.calculateCodexCNY(input: 300_000, cachedInput: 100_000,
+                cacheWriteInput: 100_000, output: 10_000, reasoning: 5_000,
+                model: model, serviceTier: "default"), long, accuracy: 0.000_001)
+        }
+    }
+
     func testPriceChangesInvalidateCostCache() {
         let original = Data("old catalog".utf8)
         XCTAssertEqual(PricingEngine.catalogFingerprint(original), PricingEngine.catalogFingerprint(original))

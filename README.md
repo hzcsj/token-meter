@@ -36,7 +36,7 @@ TokenMeter is a menu bar app (`LSUIElement`) and does not show a Dock icon.
 ### 1. Download from GitHub Releases
 
 1. Open the [TokenMeter Releases page](https://github.com/hzcsj/token-meter/releases).
-2. Download `TokenMeter-v0.2.3-macos-universal.zip` and `SHA256SUMS`.
+2. Download `TokenMeter-v0.2.4-macos-universal.zip` and `SHA256SUMS`.
 3. Optionally verify the download from the directory containing both files:
 
    ```bash
@@ -64,7 +64,7 @@ To create a release bundle without installing anything or changing `launchctl` s
 bash scripts/package.sh --arch universal --output-dir dist
 ```
 
-This produces `dist/TokenMeter.app` and `dist/TokenMeter-v0.2.3-macos-universal.zip` without writing to `/Applications`.
+This produces `dist/TokenMeter.app` and `dist/TokenMeter-v0.2.4-macos-universal.zip` without writing to `/Applications`.
 
 ## Signing, notarization, and Gatekeeper
 
@@ -112,6 +112,10 @@ Virtual costs use official on-demand API rates, including publicly advertised mo
 The September 5, 2026 catalog adds GPT-6 Astra and Claude Fable/Mythos 5.1. GPT-6 Astra costs $10 input / $1 cache read / $12.50 cache write / $50 output per million tokens, with long-context rates above 272K input tokens and 2× API Fast/Priority rates. Fable/Mythos 5.1 cost $10 input / $50 output with $0.25 cache reads; their 5m/1h cache-write rates remain $12.50/$20. Sources: [OpenAI pricing](https://developers.openai.com/api/docs/pricing), [OpenAI changelog](https://developers.openai.com/api/docs/changelog), and [Anthropic pricing](https://platform.claude.com/docs/en/about-claude/pricing).
 
 ### Historical pricing
+
+The September 23, 2026 catalog adds Claude Opus 5.5 ($4 input / $20 output / $0.20 cache read / $5 5m cache write / $8 1h cache write per million tokens), GPT-6 Sol ($2 input / $10 output / $0.20 cached input / $2.50 cache write), and GPT-6 Luna ($0.10 / $0.50 / $0.01 / $0.125). GPT-6 Sol/Luna use long-context rates above 272K input tokens and 2× API Fast/Priority rates in Codex. Opus 5.5 uses standard rates throughout its context window. Sources: [Anthropic pricing](https://platform.claude.com/docs/en/about-claude/pricing), [OpenAI pricing](https://developers.openai.com/api/docs/pricing), [GPT-6 Sol](https://developers.openai.com/api/docs/models/gpt-6-sol), and [GPT-6 Luna](https://developers.openai.com/api/docs/models/gpt-6-luna).
+
+Existing model rates, fallback choices, and dated price revisions are unchanged. Newly recognized model IDs are recalculated at their own rates instead of their previous fallback estimates.
 
 `price_history` stores prior rates with exclusive `effective_until` cutoffs. Claude, Codex, and OpenCode pass each usage record's timestamp to the pricing engine; the earliest matching cutoff is selected after resolving the exact model or longest variant prefix. Only models listed in a revision are overridden, so a new model never inherits an unrelated old fallback.
 

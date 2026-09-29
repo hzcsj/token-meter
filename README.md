@@ -96,7 +96,7 @@ Every five minutes TokenMeter:
 
 Set `OPENCODE_DB_PATH` to override the default OpenCode database location. Missing, corrupt, or incompatible rows are skipped without preventing the other sources from loading.
 
-Codex quotas refresh separately every minute and on wake/menu open (debounced to 30 seconds), using the installed Codex/ChatGPT desktop app or Codex CLI. Only the official `codex` bucket is selected; auxiliary/Spark buckets cannot replace it. Network failures retain the last successful quota, with local records as the initial fallback. Signed-out, API-key-only, and free accounts show usage without quotas or login prompts. Local usage tracking does not require Codex authentication or a subscription.
+Codex quotas refresh separately every minute and on wake/menu open (debounced to 30 seconds), using the installed Codex/ChatGPT desktop app or Codex CLI. Both the nested `codex-cli/CodexCLI.app` layout and legacy desktop layouts are discovered on every attempt, including under launchd's minimal PATH. Only the official `codex` bucket is selected; auxiliary/Spark buckets cannot replace it. A successful live read takes priority. If a read fails, a newer valid local main-bucket observation with the same plan can replace the cached observation, including its entire set of reset windows. Old caches cannot permanently mask new local records. Signed-out, API-key-only, Free, and Go accounts show usage without quotas or login prompts; logs alone do not establish an active subscription. Fixed error categories are recorded in macOS unified logging without account data or raw RPC responses. Local usage tracking does not require Codex authentication or a subscription.
 
 ## Pricing
 

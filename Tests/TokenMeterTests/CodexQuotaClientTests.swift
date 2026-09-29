@@ -67,7 +67,8 @@ final class CodexQuotaClientTests: XCTestCase {
 
     func testNoLoginAPIKeyAndFreeAccountsNeverRequestQuotaOrLogin() {
         for account: Any in [NSNull(), ["type": "apiKey"], ["type": "amazonBedrock"],
-                             ["type": "chatgpt", "planType": "free"]] {
+                             ["type": "chatgpt", "planType": "free"],
+                             ["type": "chatgpt", "planType": "go"]] {
             var exchange = initializedExchange()
             let step = exchange.receive(["id": 2, "result": ["account": account]])
             XCTAssertTrue(step.requests.isEmpty)
@@ -92,7 +93,7 @@ final class CodexQuotaClientTests: XCTestCase {
         let q = try XCTUnwrap(parse(["rateLimits": bucket()]))
         let local = resolveCodexQuota(trusted: q, untrusted: nil)
         XCTAssertNil(displayedCodexQuota(live: .noSubscription, local: local))
-        XCTAssertEqual(displayedCodexQuota(live: .unavailable, local: local), local)
+        XCTAssertNil(displayedCodexQuota(live: .unavailable, local: local))
         XCTAssertNil(displayedCodexQuota(live: .unavailable, local: nil))
         XCTAssertEqual(displayedCodexQuota(live: .quota(q), local: local)?.windows.first?.remainingPercent, 48)
     }
@@ -106,10 +107,10 @@ final class CodexQuotaClientTests: XCTestCase {
         _ = await service.refresh(now: now, read: { .quota(q) })
         XCTAssertTrue(FileManager.default.fileExists(atPath: file.path))
         let cached = await service.refresh(now: now.addingTimeInterval(60), read: { .unavailable })
-        guard case .quota(let saved) = cached else { return XCTFail("Keep last known main bucket") }
+        guard case .cached(let saved) = cached else { return XCTFail("Keep last known main bucket as cached, not live") }
         XCTAssertEqual(saved.windows, q.windows)
         let reloaded = CodexQuotaService(cacheURL: file)
-        guard case .quota = await reloaded.refresh(now: now, read: { .unavailable }) else {
+        guard case .cached = await reloaded.refresh(now: now, read: { .unavailable }) else {
             return XCTFail("Cache must survive restart")
         }
         guard case .noSubscription = await service.refresh(now: now.addingTimeInterval(120), read: { .noSubscription }) else {
@@ -132,6 +133,74 @@ final class CodexQuotaClientTests: XCTestCase {
             XCTFail("Must not start a second query within 30 seconds")
             return .unavailable
         })
+    }
+
+    func testDesktopLayoutsWorkWithoutShellPATHAndAreRediscovered() {
+        let directories = [URL(fileURLWithPath: "/Applications"), URL(fileURLWithPath: "/Users/test/Applications")]
+        let layouts = [
+            "/Applications/ChatGPT.app/Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS/codex",
+            "/Applications/ChatGPT.app/Contents/Resources/codex",
+            "/Applications/Codex.app/Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS/codex",
+            "/Users/test/Applications/Codex.app/Contents/Resources/codex",
+        ]
+        for installed in layouts {
+            let result = CodexQuotaClient.executableURL(applicationDirectories: directories,
+                path: "/usr/bin:/bin:/usr/sbin:/sbin", isExecutable: { $0 == installed }, bundleExecutable: { _ in nil })
+            XCTAssertEqual(result?.path, installed)
+        }
+        XCTAssertNil(CodexQuotaClient.executableURL(applicationDirectories: directories,
+            path: "relative/bin", isExecutable: { _ in false }, bundleExecutable: { _ in nil }))
+    }
+
+    func testBundleMetadataAndStandaloneCLIFallback() {
+        let custom = URL(fileURLWithPath: "/Applications/ChatGPT.app/Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS/renamed")
+        XCTAssertEqual(CodexQuotaClient.executableURL(applicationDirectories: [URL(fileURLWithPath: "/Applications")],
+            path: "", isExecutable: { $0 == custom.path }, bundleExecutable: { _ in custom }), custom)
+        let cli = "/custom/bin/codex"
+        XCTAssertEqual(CodexQuotaClient.executableURL(applicationDirectories: [], path: "relative:/custom/bin",
+            isExecutable: { $0 == cli }, bundleExecutable: { _ in nil })?.path, cli)
+    }
+
+    func testNewLocalObservationReplacesFailedLiveCacheButNotSuccessfulRead() throws {
+        let old = try XCTUnwrap(parse(["rateLimits": bucket(primary: window(10080, used: 4))]))
+        let newer = CodexQuotaSnapshot(windows: [CodexQuota.Window(sourceSlot: "primary", usedPercent: 13,
+            windowMinutes: 10080, resetsAt: old.windows[0].resetsAt)], planType: "pro", model: "gpt-6-astra",
+            timestamp: now.addingTimeInterval(60), limitId: "codex")
+        let local = try XCTUnwrap(resolveCodexQuota(trusted: newer, untrusted: nil))
+        XCTAssertEqual(local.observedAt, newer.timestamp)
+        XCTAssertEqual(displayedCodexQuota(live: .cached(old), local: local)?.windows[0].remainingPercent, 87)
+        XCTAssertEqual(displayedCodexQuota(live: .quota(old), local: local)?.windows[0].remainingPercent, 96)
+        XCTAssertNil(displayedCodexQuota(live: .noSubscription, local: local))
+        XCTAssertNil(displayedCodexQuota(live: .unavailable, local: local))
+    }
+
+    func testBankedResetReplacesEntireSnapshotWithoutMixingWindows() throws {
+        let old = try XCTUnwrap(parse(["rateLimits": bucket(primary: window(300, used: 50), secondary: window(10080, used: 100))]))
+        let reset = now.addingTimeInterval(7 * 86400)
+        let new = CodexQuotaSnapshot(windows: [.init(sourceSlot: "primary", usedPercent: 2,
+            windowMinutes: 10080, resetsAt: reset)], planType: "pro", model: "gpt-6-sol",
+            timestamp: now.addingTimeInterval(120), limitId: "codex")
+        let local = resolveCodexQuota(trusted: new, untrusted: nil)
+        let displayed = try XCTUnwrap(displayedCodexQuota(live: .cached(old), local: local))
+        XCTAssertEqual(displayed.windows.map(\.windowMinutes), [10080])
+        XCTAssertEqual(displayed.windows[0].resetsAt, reset)
+        XCTAssertEqual(displayed.windows[0].remainingPercent, 98)
+    }
+
+    func testStaleAuxiliaryUnknownTimeAndDifferentPlanCannotOverrideCache() throws {
+        let old = try XCTUnwrap(parse(["rateLimits": bucket(primary: window(10080, used: 4))]))
+        for (plan, id, date): (String, String?, Date?) in [
+            ("pro", "codex_bengalfox", now.addingTimeInterval(60)),
+            ("plus", "codex", now.addingTimeInterval(60)),
+            ("pro", "codex", now.addingTimeInterval(-60)),
+            ("pro", "codex", nil),
+            ("pro", "codex", Date().addingTimeInterval(3600)),
+        ] {
+            let local = CodexQuota(planType: plan, model: "gpt-6-astra", windows: [
+                .init(sourceSlot: "primary", usedPercent: 13, windowMinutes: 10080, resetsAt: old.windows[0].resetsAt)
+            ], observedAt: date, limitId: id)
+            XCTAssertEqual(displayedCodexQuota(live: .cached(old), local: local)?.windows[0].remainingPercent, 96)
+        }
     }
 
     func testTransportCompletesHandshakeWithoutAnyLoginRequests() {

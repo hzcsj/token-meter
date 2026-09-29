@@ -73,6 +73,8 @@ struct CodexQuota: Codable, Equatable {
     let planType: String
     let model: String
     let windows: [Window]
+    var observedAt: Date? = nil
+    var limitId: String? = nil
 
     struct Window: Codable, Equatable {
         let sourceSlot: String

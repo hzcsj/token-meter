@@ -9,7 +9,11 @@ struct CodexQuotaSnapshot: Codable {
     let limitId: String?
 
     var isTrusted: Bool {
-        return limitId == "codex"
+        limitId == "codex" && !windows.isEmpty && windows.allSatisfy {
+            $0.usedPercent.isFinite && (0...100).contains($0.usedPercent) &&
+            (1...525_600).contains($0.windowMinutes) &&
+            $0.resetsAt.timeIntervalSince1970.isFinite && $0.resetsAt > timestamp
+        } && Set(windows.map(\.windowMinutes)).count == windows.count
     }
 }
 
@@ -26,11 +30,13 @@ func resolveCodexQuota(
     untrusted: CodexQuotaSnapshot?
 ) -> CodexQuota? {
     if let trusted {
-        guard !trusted.windows.isEmpty else { return nil }
+        guard trusted.isTrusted, !["free", "go"].contains(trusted.planType.lowercased()) else { return nil }
         return CodexQuota(
             planType: trusted.planType,
             model: trusted.model,
-            windows: trusted.windows
+            windows: trusted.windows,
+            observedAt: trusted.timestamp,
+            limitId: trusted.limitId
         )
     }
 
@@ -256,12 +262,16 @@ struct CodexUsageScanner {
                         let limitId = rateLimits["limit_id"] as? String
 
                         var windows: [CodexQuota.Window] = []
+                        var validWindows = true
                         for slot in ["primary", "secondary"] {
-                            guard let w = rateLimits[slot] as? [String: Any] else { continue }
-                            let used = w["used_percent"] as? Double ?? 0
-                            let winMin = w["window_minutes"] as? Int ?? 0
-                            let resetsAt = w["resets_at"] as? TimeInterval ?? 0
-                            guard winMin > 0 else { continue }
+                            guard let value = rateLimits[slot], !(value is NSNull) else { continue }
+                            guard let w = value as? [String: Any],
+                                  let used = w["used_percent"] as? Double,
+                                  let winMin = w["window_minutes"] as? Int,
+                                  let resetsAt = w["resets_at"] as? TimeInterval else {
+                                validWindows = false
+                                break
+                            }
                             windows.append(CodexQuota.Window(
                                 sourceSlot: slot,
                                 usedPercent: used,
@@ -269,6 +279,7 @@ struct CodexUsageScanner {
                                 resetsAt: Date(timeIntervalSince1970: resetsAt)
                             ))
                         }
+                        guard validWindows else { continue }
                         windows.sort { $0.windowMinutes < $1.windowMinutes }
 
                         let snapshot = CodexQuotaSnapshot(

@@ -1,8 +1,10 @@
 import Foundation
 import Darwin
+import OSLog
 
 enum CodexQuotaReadResult {
     case quota(CodexQuotaSnapshot)
+    case cached(CodexQuotaSnapshot)
     case noSubscription
     case unavailable
 }
@@ -10,18 +12,37 @@ enum CodexQuotaReadResult {
 /// Only account RPCs are used. Authentication and refresh remain owned by Codex;
 /// TokenMeter never opens credential files or starts a login flow.
 struct CodexQuotaClient {
-    static func executableURL() -> URL? {
-        let home = FileManager.default.homeDirectoryForCurrentUser.path
-        let candidates = [
-            "/Applications/ChatGPT.app/Contents/Resources/codex",
-            "/Applications/Codex.app/Contents/Resources/codex",
-            "\(home)/Applications/ChatGPT.app/Contents/Resources/codex",
-            "\(home)/Applications/Codex.app/Contents/Resources/codex",
-            "/opt/homebrew/bin/codex", "/usr/local/bin/codex",
-        ] + (ProcessInfo.processInfo.environment["PATH"] ?? "")
+    private static let logger = Logger(subsystem: "io.github.hzcsj.tokenmeter", category: "CodexQuota")
+
+    // Resolve again on every attempt: the desktop app can replace its bundled CLI
+    // while TokenMeter stays running, and launchd has a minimal PATH.
+    static func executableURL(
+        applicationDirectories: [URL] = [URL(fileURLWithPath: "/Applications"),
+            FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Applications")],
+        path: String = ProcessInfo.processInfo.environment["PATH"] ?? "",
+        isExecutable: (String) -> Bool = { FileManager.default.isExecutableFile(atPath: $0) },
+        bundleExecutable: (URL) -> URL? = { Bundle(url: $0)?.executableURL }
+    ) -> URL? {
+        var candidates: [String] = []
+        for directory in applicationDirectories {
+            for name in ["ChatGPT.app", "Codex.app"] {
+                let resources = directory.appendingPathComponent("\(name)/Contents/Resources")
+                let cliBundle = resources.appendingPathComponent("codex-cli/CodexCLI.app")
+                if let executable = bundleExecutable(cliBundle) { candidates.append(executable.path) }
+                candidates.append(cliBundle.appendingPathComponent("Contents/MacOS/codex").path)
+                candidates.append(resources.appendingPathComponent("codex").path)
+            }
+        }
+        candidates += ["/opt/homebrew/bin/codex", "/usr/local/bin/codex"] + path
             .split(separator: ":").filter { $0.hasPrefix("/") }.map { "\($0)/codex" }
-        return candidates.first { FileManager.default.isExecutableFile(atPath: $0) }
+        return candidates.first(where: isExecutable)
             .map { URL(fileURLWithPath: $0) }
+    }
+
+    private static func unavailable(_ reason: String) -> CodexQuotaReadResult {
+        // Only fixed diagnostic categories, never RPC payloads or credentials.
+        logger.notice("Quota refresh unavailable: \(reason, privacy: .public)")
+        return .unavailable
     }
 
     static func read(
@@ -29,7 +50,7 @@ struct CodexQuotaClient {
         arguments: [String] = ["app-server", "--listen", "stdio://"],
         timeout: TimeInterval = 20
     ) -> CodexQuotaReadResult {
-        guard let executable else { return .unavailable }
+        guard let executable else { return unavailable("executable_missing") }
         let process = Process()
         let input = Pipe(), output = Pipe()
         process.executableURL = executable
@@ -71,27 +92,31 @@ struct CodexQuotaClient {
                 var descriptor = pollfd(fd: output.fileHandleForReading.fileDescriptor,
                                         events: Int16(POLLIN), revents: 0)
                 let ready = poll(&descriptor, 1, 100)
-                if ready < 0 { if errno == EINTR { continue }; return .unavailable }
+                if ready < 0 { if errno == EINTR { continue }; return unavailable("transport_poll") }
                 guard ready > 0 else { continue }
                 let data = output.fileHandleForReading.availableData
-                guard !data.isEmpty else { return .unavailable }
+                guard !data.isEmpty else { return unavailable("transport_closed") }
                 bytesRead += data.count
-                guard bytesRead <= 1_048_576 else { return .unavailable }
+                guard bytesRead <= 1_048_576 else { return unavailable("response_too_large") }
                 buffer.append(data)
                 while let newline = buffer.firstIndex(of: 0x0A) {
                     let line = buffer[..<newline]
                     buffer.removeSubrange(...newline)
                     guard let message = try JSONSerialization.jsonObject(with: line) as? [String: Any]
-                    else { return .unavailable }
+                    else { return unavailable("invalid_response") }
                     let step = exchange.receive(message)
                     for request in step.requests { try send(request) }
-                    if let result = step.result { return result }
+                    if let result = step.result {
+                        if case .unavailable = result { return unavailable("rpc_or_schema") }
+                        return result
+                    }
                 }
             }
         } catch {
             // RPC errors may contain account details; never log the raw response.
+            return unavailable("launch_or_transport")
         }
-        return .unavailable
+        return unavailable("timeout")
     }
 }
 
@@ -132,7 +157,7 @@ struct CodexQuotaExchange {
             if type == "apiKey" || type == "amazonBedrock" { return ([], .noSubscription) }
             guard type == "chatgpt" else { return ([], .unavailable) }
             planType = account["planType"] as? String
-            if planType == "free" { return ([], .noSubscription) }
+            if ["free", "go"].contains(planType?.lowercased() ?? "") { return ([], .noSubscription) }
             expectedID = 3
             return ([["id": 3, "method": "account/rateLimits/read"]], nil)
         default:
@@ -163,9 +188,10 @@ struct CodexQuotaExchange {
                                  resetsAt: Date(timeIntervalSince1970: reset)))
         }
         guard !windows.isEmpty else { return nil }
-        return CodexQuotaSnapshot(windows: windows.sorted { $0.windowMinutes < $1.windowMinutes },
+        let snapshot = CodexQuotaSnapshot(windows: windows.sorted { $0.windowMinutes < $1.windowMinutes },
                                   planType: bucket["planType"] as? String ?? planType ?? "",
                                   model: "", timestamp: now, limitId: "codex")
+        return snapshot.isTrusted ? snapshot : nil
     }
 }
 
@@ -176,6 +202,7 @@ actor CodexQuotaService {
     private var noSubscription = false
     private var lastAttempt: Date = .distantPast
     private var fetching = false
+    private var lastReadSucceeded = false
 
     init(cacheURL: URL = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
         .appendingPathComponent("token-meter/codex_live_quota_v1.json")) {
@@ -196,8 +223,10 @@ actor CodexQuotaService {
         fetching = false
         switch result {
         case .quota(let quota):
+            guard quota.isTrusted else { lastReadSucceeded = false; return currentResult }
             snapshot = quota
             noSubscription = false
+            lastReadSucceeded = true
             let encoder = JSONEncoder()
             encoder.dateEncodingStrategy = .secondsSince1970
             if let data = try? encoder.encode(quota) {
@@ -207,15 +236,17 @@ actor CodexQuotaService {
         case .noSubscription:
             snapshot = nil
             noSubscription = true
+            lastReadSucceeded = false
             try? FileManager.default.removeItem(at: cacheURL)
-        case .unavailable: break
+        case .unavailable, .cached:
+            lastReadSucceeded = false
         }
         return currentResult
     }
 
     private var currentResult: CodexQuotaReadResult {
         if noSubscription { return .noSubscription }
-        if let snapshot { return .quota(snapshot) }
+        if let snapshot { return lastReadSucceeded ? .quota(snapshot) : .cached(snapshot) }
         return .unavailable
     }
 }
@@ -223,9 +254,27 @@ actor CodexQuotaService {
 func displayedCodexQuota(live: CodexQuotaReadResult, local: CodexQuota?) -> CodexQuota? {
     switch live {
     case .quota(let snapshot):
-        return CodexQuota(planType: snapshot.planType.isEmpty ? local?.planType ?? "" : snapshot.planType,
-                          model: local?.model ?? "Codex", windows: snapshot.windows)
-    case .noSubscription: return nil
-    case .unavailable: return local
+        return resolvedLiveQuota(snapshot, local: local)
+    case .cached(let snapshot):
+        if let local, let observedAt = local.observedAt,
+           observedAt > snapshot.timestamp, observedAt <= Date(),
+           local.limitId == "codex", local.planType == snapshot.planType,
+           CodexQuotaSnapshot(windows: local.windows, planType: local.planType, model: local.model,
+                              timestamp: observedAt, limitId: local.limitId).isTrusted {
+            // Replace the whole observation, including banked resets and window
+            // changes. Never splice 5H and 7D windows from different observations.
+            return local
+        }
+        return resolvedLiveQuota(snapshot, local: local)
+    case .noSubscription, .unavailable:
+        // Logs alone cannot establish an active subscription or current login.
+        return nil
     }
+}
+
+private func resolvedLiveQuota(_ snapshot: CodexQuotaSnapshot, local: CodexQuota?) -> CodexQuota? {
+    guard snapshot.isTrusted, !["free", "go"].contains(snapshot.planType.lowercased()) else { return nil }
+    return CodexQuota(planType: snapshot.planType.isEmpty ? local?.planType ?? "" : snapshot.planType,
+                      model: local?.model ?? "Codex", windows: snapshot.windows,
+                      observedAt: snapshot.timestamp, limitId: snapshot.limitId)
 }

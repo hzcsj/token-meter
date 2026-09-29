@@ -46,6 +46,7 @@ final class PricingEngine {
             return 0.0
         }
 
+        let timestamp = timestamp ?? Date()
         let price = pricing.findModelPrice(model, at: timestamp)
         let rate = price.isCNY ? 1.0 : pricing.meta.exchangeRateUSDtoCNY
         let contextInput = max(0, usage.input)
@@ -62,7 +63,7 @@ final class PricingEngine {
             Double(usage.cacheRead) * rates.cacheRead
         ) / 1_000_000.0
 
-        return usd * rate
+        return usd * rate * pricing.timeMultiplier(for: price, at: timestamp)
     }
 
     func calculateCodexCNY(

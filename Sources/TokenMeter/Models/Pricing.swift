@@ -7,6 +7,44 @@ struct Pricing: Codable {
     let codexModelsUSD: [String: CodexModelPrice]
     let codexFallbackModel: String
     var priceHistory: [HistoricalPrices]? = nil
+    var timeSchedules: [String: TimeSchedule]? = nil
+
+    /// Event-time pricing, independent of the user's local timezone.
+    struct TimeSchedule: Codable {
+        let timezone: String
+        let peakWeekdays: [Int]
+        let peakHours: [[Int]]
+        let offPeakMultiplier: Double
+        let holidayTimezone: String
+        let holidays: [String]
+
+        enum CodingKeys: String, CodingKey {
+            case timezone, holidays
+            case peakWeekdays = "peak_weekdays"
+            case peakHours = "peak_hours"
+            case offPeakMultiplier = "off_peak_multiplier"
+            case holidayTimezone = "holiday_timezone"
+        }
+
+        func multiplier(at timestamp: Date) -> Double {
+            guard timestamp.timeIntervalSince1970.isFinite,
+                  let zone = TimeZone(identifier: timezone),
+                  let holidayZone = TimeZone(identifier: holidayTimezone) else { return 1 }
+            var calendar = Calendar(identifier: .gregorian)
+            calendar.timeZone = holidayZone
+            let components = calendar.dateComponents([.year, .month, .day], from: timestamp)
+            guard let year = components.year, let month = components.month, let date = components.day else { return 1 }
+            let day = String(format: "%04d-%02d-%02d", year, month, date)
+            if holidays.contains(day) { return offPeakMultiplier }
+            calendar.timeZone = zone
+            let weekday = calendar.component(.weekday, from: timestamp)
+            let hour = calendar.component(.hour, from: timestamp)
+            let peak = peakWeekdays.contains(weekday) && peakHours.contains {
+                $0.count == 2 && hour >= $0[0] && hour < $0[1]
+            }
+            return peak ? 1 : offPeakMultiplier
+        }
+    }
 
     /// Prior rates apply strictly before the cutoff; missing models use current rates.
     struct HistoricalPrices: Codable {
@@ -64,6 +102,7 @@ struct Pricing: Codable {
         let longCacheWrite5m: Double?
         let longCacheWrite1h: Double?
         let longCacheRead: Double?
+        var timeSchedule: String? = nil
 
         enum CodingKeys: String, CodingKey {
             case input, output
@@ -78,6 +117,7 @@ struct Pricing: Codable {
             case longCacheWrite5m = "long_cache_write_5m"
             case longCacheWrite1h = "long_cache_write_1h"
             case longCacheRead = "long_cache_read"
+            case timeSchedule = "time_schedule"
         }
 
         var isCNY: Bool {
@@ -161,6 +201,7 @@ struct Pricing: Codable {
         case codexModelsUSD = "codex_models_usd_per_mtok"
         case codexFallbackModel = "codex_fallback_model"
         case priceHistory = "price_history"
+        case timeSchedules = "time_schedules"
     }
 }
 
@@ -170,14 +211,19 @@ extension Pricing {
             .filter { model.isPricingVariant(of: $0) }
             .max(by: { $0.count < $1.count }) ?? fallbackModel
 
-        if let timestamp,
-           let history = priceHistory?.filter({
+        let timestamp = timestamp ?? Date()
+        if let history = priceHistory?.filter({
                timestamp < $0.effectiveUntil && $0.modelsUSD?[key] != nil
            }).min(by: { $0.effectiveUntil < $1.effectiveUntil }),
            let price = history.modelsUSD?[key] {
             return price
         }
         return modelsUSD[key] ?? modelsUSD[fallbackModel] ?? modelsUSD.values.first!
+    }
+
+    func timeMultiplier(for price: ModelPrice, at timestamp: Date) -> Double {
+        guard let key = price.timeSchedule, let schedule = timeSchedules?[key] else { return 1 }
+        return schedule.multiplier(at: timestamp)
     }
 
     func findCodexModelPrice(_ model: String, at timestamp: Date? = nil) -> CodexModelPrice {

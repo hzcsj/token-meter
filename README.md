@@ -36,7 +36,7 @@ TokenMeter is a menu bar app (`LSUIElement`) and does not show a Dock icon.
 ### 1. Download from GitHub Releases
 
 1. Open the [TokenMeter Releases page](https://github.com/hzcsj/token-meter/releases).
-2. Download `TokenMeter-v0.2.4-macos-universal.zip` and `SHA256SUMS`.
+2. Download the release's `TokenMeter-v<version>-macos-universal.zip` and `SHA256SUMS`.
 3. Optionally verify the download from the directory containing both files:
 
    ```bash
@@ -64,7 +64,7 @@ To create a release bundle without installing anything or changing `launchctl` s
 bash scripts/package.sh --arch universal --output-dir dist
 ```
 
-This produces `dist/TokenMeter.app` and `dist/TokenMeter-v0.2.4-macos-universal.zip` without writing to `/Applications`.
+This produces `dist/TokenMeter.app` and `dist/TokenMeter-v0.2.5-macos-universal.zip` without writing to `/Applications`.
 
 ## Signing, notarization, and Gatekeeper
 
@@ -115,7 +115,7 @@ The September 5, 2026 catalog adds GPT-6 Astra and Claude Fable/Mythos 5.1. GPT-
 
 The September 23, 2026 catalog adds Claude Opus 5.5 ($4 input / $20 output / $0.20 cache read / $5 5m cache write / $8 1h cache write per million tokens), GPT-6 Sol ($2 input / $10 output / $0.20 cached input / $2.50 cache write), and GPT-6 Luna ($0.10 / $0.50 / $0.01 / $0.125). GPT-6 Sol/Luna use long-context rates above 272K input tokens and 2× API Fast/Priority rates in Codex. Opus 5.5 uses standard rates throughout its context window. Sources: [Anthropic pricing](https://platform.claude.com/docs/en/about-claude/pricing), [OpenAI pricing](https://developers.openai.com/api/docs/pricing), [GPT-6 Sol](https://developers.openai.com/api/docs/models/gpt-6-sol), and [GPT-6 Luna](https://developers.openai.com/api/docs/models/gpt-6-luna).
 
-Existing model rates, fallback choices, and dated price revisions are unchanged. Newly recognized model IDs are recalculated at their own rates instead of their previous fallback estimates.
+The September 29, 2026 catalog adds Sonnet 5.5, Gemini 3.7/3.8 Flash, Qwen3.8 and GLM-5.3 mappings. Gemini promotions and DeepSeek peak/off-peak prices now follow each request's timestamp. Existing OpenAI/Anthropic rates, fallback choices, and historical revisions are retained. Newly recognized model IDs are recalculated at their own rates instead of their previous fallback estimates. See the [pricing audit](docs/pricing-2026-09-29.md) for rates, sources and known estimation boundaries.
 
 `price_history` stores prior rates with exclusive `effective_until` cutoffs. Claude, Codex, and OpenCode pass each usage record's timestamp to the pricing engine; the earliest matching cutoff is selected after resolving the exact model or longest variant prefix. Only models listed in a revision are overridden, so a new model never inherits an unrelated old fallback.
 
@@ -123,6 +123,8 @@ Existing model rates, fallback choices, and dated price revisions are unchanged.
 - Sol (including the `gpt-5.6` alias) retains $5/$30 before August 21, then uses $4/$20.
 - From July 30, GPT-5.6 `fast` and `priority` both use 2× API rates. Earlier catalog estimates are retained.
 - Official announcements specify dates without an exact time; cutoffs use 00:00 UTC (08:00 Asia/Shanghai).
+- Gemini 3.6 retains earlier estimates before the September 29 catalog adoption date; Flash introductory pricing expires on January 1, 2027. Exact official DeepSeek change instants override the date-only convention.
+- `time_schedules` applies DeepSeek weekday peak hours, off-peak multipliers and the 2026 Chinese holiday calendar in provider timezones, never the local computer timezone. Future holiday calendars require a catalog update.
 
 When updating an existing price, append a dated revision containing the **complete previous rate entry** before editing the current table; never overwrite earlier revisions. The catalog fingerprint automatically invalidates cost caches. A rebuild uses event-time prices, not today's prices for all records. Existing cache files are left intact. Earlier unverified price history retains the previous catalog baseline; correcting a missing model or a counting bug can still change past estimates. These are virtual API-equivalent costs, not subscription bills. Provider-specific verification dates are recorded in `_meta.provider_last_verified`.
 

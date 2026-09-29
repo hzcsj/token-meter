@@ -6,24 +6,111 @@
     "codex_speed_source": "https://developers.openai.com/codex/speed",
     "google_pricing_source": "https://ai.google.dev/gemini-api/docs/pricing",
     "qwen_pricing_source": "https://help.aliyun.com/zh/model-studio/model-pricing",
-    "glm_pricing_source": "https://bigmodel.cn/pricing",
+    "glm_pricing_source": "https://docs.bigmodel.cn/cn/guide/start/pricing",
     "deepseek_pricing_source": "https://api-docs.deepseek.com/quick_start/pricing",
-    "last_updated": "2026-09-23",
+    "last_updated": "2026-09-29",
     "note": "Official on-demand API rates, including the publicly advertised GPT-5.6 Sol promotion (at least through 2026-11-21); no automatic expiry is assumed. Sonnet 5 remains $2/$10. Batch/Flex, regional uplifts, and time-based cache storage are excluded. USD uses configured 7.0 CNY conversion. Fast/priority use API rates from 2026-07-30; earlier estimates are preserved in price_history.",
     "openai_changelog_source": "https://developers.openai.com/api/docs/changelog",
     "openai_fast_source": "https://developers.openai.com/api/docs/guides/fast-mode",
     "claude_changelog_source": "https://platform.claude.com/docs/en/release-notes/overview",
+    "qwen_cache_source": "https://bailian.console.aliyun.com/",
+    "pricing_audit": "docs/pricing-2026-09-29.md",
     "provider_last_verified": {
-      "openai": "2026-09-23",
-      "anthropic": "2026-09-23",
-      "google": "2026-07-25",
-      "qwen": "2026-07-25",
-      "glm": "2026-07-25",
-      "deepseek": "2026-07-25"
+      "openai": "2026-09-29",
+      "anthropic": "2026-09-29",
+      "google": "2026-09-29",
+      "qwen": "2026-09-29",
+      "glm": "2026-09-29",
+      "deepseek": "2026-09-29"
     },
     "history_note": "price_history preserves prior catalog rates for records strictly before each effective_until (exclusive). Official changelog dates: Terra/Luna and Fast on 2026-07-30; Sol on 2026-08-21. Sources give dates, not exact instants; boundaries use 00:00 UTC. No verified history is available before the previous catalog; its rates remain the baseline. New model IDs use their own prices even for historical records, correcting former fallback estimates."
   },
   "models_usd_per_mtok": {
+    "claude-sonnet-5-5": {
+      "input": 2,
+      "output": 10,
+      "cache_write_5m": 2.5,
+      "cache_write_1h": 4,
+      "cache_read": 0.2
+    },
+    "gemini-3.8-flash": {
+      "input": 1.5,
+      "output": 7.5,
+      "cache_write_5m": 1.5,
+      "cache_write_1h": 1.5,
+      "cache_read": 0.15
+    },
+    "gemini-3.7-flash": {
+      "input": 1.5,
+      "output": 7.5,
+      "cache_write_5m": 1.5,
+      "cache_write_1h": 1.5,
+      "cache_read": 0.15
+    },
+    "qwen3.8-max": {
+      "input": 12,
+      "output": 36,
+      "cache_write_5m": 15,
+      "cache_write_1h": 15,
+      "cache_read": 1,
+      "currency": "CNY"
+    },
+    "qwen3.8-flash": {
+      "input": 0.8,
+      "output": 2.7,
+      "cache_write_5m": 1.25,
+      "cache_write_1h": 1.25,
+      "cache_read": 0.1,
+      "currency": "CNY"
+    },
+    "qwen3.8-2.4t-a95b": {
+      "input": 12,
+      "output": 36,
+      "cache_write_5m": 15,
+      "cache_write_1h": 15,
+      "cache_read": 1,
+      "currency": "CNY"
+    },
+    "qwen3.8-27b": {
+      "input": 3,
+      "output": 12,
+      "cache_write_5m": 3.75,
+      "cache_write_1h": 3.75,
+      "cache_read": 0.3,
+      "currency": "CNY"
+    },
+    "glm-5.3": {
+      "input": 8,
+      "output": 28,
+      "cache_write_5m": 8,
+      "cache_write_1h": 8,
+      "cache_read": 2,
+      "currency": "CNY"
+    },
+    "glm-5.3-flash": {
+      "input": 0.8,
+      "output": 2.8,
+      "cache_write_5m": 0.8,
+      "cache_write_1h": 0.8,
+      "cache_read": 0.23,
+      "currency": "CNY"
+    },
+    "glm-5.3-flashx": {
+      "input": 2,
+      "output": 7,
+      "cache_write_5m": 2,
+      "cache_write_1h": 2,
+      "cache_read": 0.57,
+      "currency": "CNY"
+    },
+    "deepseek-flash": {
+      "input": 0.3,
+      "output": 1.2,
+      "cache_write_5m": 0.3,
+      "cache_write_1h": 0.3,
+      "cache_read": 0.006,
+      "time_schedule": "deepseek_peak_2026"
+    },
     "claude-opus-5-5": {
       "input": 4,
       "output": 20,
@@ -293,18 +380,20 @@
       "currency": "CNY"
     },
     "deepseek-v4-pro": {
-      "input": 0.435,
-      "output": 0.87,
-      "cache_write_5m": 0.435,
-      "cache_write_1h": 0.435,
-      "cache_read": 0.003625
+      "input": 1.32,
+      "output": 3.96,
+      "cache_write_5m": 1.32,
+      "cache_write_1h": 1.32,
+      "cache_read": 0.044,
+      "time_schedule": "deepseek_peak_2026"
     },
     "deepseek-v4-flash": {
-      "input": 0.14,
-      "output": 0.28,
-      "cache_write_5m": 0.14,
-      "cache_write_1h": 0.14,
-      "cache_read": 0.0028
+      "input": 0.3,
+      "output": 1.2,
+      "cache_write_5m": 0.3,
+      "cache_write_1h": 0.3,
+      "cache_read": 0.006,
+      "time_schedule": "deepseek_peak_2026"
     },
     "deepseek-chat": {
       "input": 0.14,
@@ -595,7 +684,89 @@
     }
   },
   "codex_fallback_model": "gpt-5.6-sol",
+  "time_schedules": {
+    "deepseek_peak_2026": {
+      "timezone": "UTC",
+      "peak_weekdays": [2, 3, 4, 5, 6],
+      "peak_hours": [[1, 4], [6, 10]],
+      "off_peak_multiplier": 0.5,
+      "holiday_timezone": "Asia/Shanghai",
+      "holidays": [
+        "2026-01-01", "2026-01-02", "2026-01-03",
+        "2026-02-15", "2026-02-16", "2026-02-17", "2026-02-18", "2026-02-19",
+        "2026-02-20", "2026-02-21", "2026-02-22", "2026-02-23",
+        "2026-04-04", "2026-04-05", "2026-04-06",
+        "2026-05-01", "2026-05-02", "2026-05-03", "2026-05-04", "2026-05-05",
+        "2026-06-19", "2026-06-20", "2026-06-21",
+        "2026-09-25", "2026-09-26", "2026-09-27",
+        "2026-10-01", "2026-10-02", "2026-10-03", "2026-10-04",
+        "2026-10-05", "2026-10-06", "2026-10-07"
+      ]
+    }
+  },
   "price_history": [
+    {
+      "effective_until": "2026-08-16T16:00:00Z",
+      "models_usd_per_mtok": {
+        "deepseek-v4-pro": {
+          "input": 0.435,
+          "output": 0.87,
+          "cache_write_5m": 0.435,
+          "cache_write_1h": 0.435,
+          "cache_read": 0.003625
+        }
+      }
+    },
+    {
+      "effective_until": "2026-09-10T04:00:00Z",
+      "models_usd_per_mtok": {
+        "deepseek-v4-flash": {
+          "input": 0.14,
+          "output": 0.28,
+          "cache_write_5m": 0.14,
+          "cache_write_1h": 0.14,
+          "cache_read": 0.0028
+        }
+      }
+    },
+    {
+      "effective_until": "2026-09-29T00:00:00Z",
+      "models_usd_per_mtok": {
+        "gemini-3.6-flash": {
+          "input": 1.5,
+          "output": 7.5,
+          "cache_write_5m": 1.5,
+          "cache_write_1h": 1.5,
+          "cache_read": 0.15
+        }
+      }
+    },
+    {
+      "effective_until": "2027-01-01T00:00:00Z",
+      "models_usd_per_mtok": {
+        "gemini-3.6-flash": {
+          "input": 0.75,
+          "output": 3.75,
+          "cache_write_5m": 0.75,
+          "cache_write_1h": 0.75,
+          "cache_read": 0.075
+        },
+        "gemini-3.7-flash": {
+          "input": 0.75,
+          "output": 3.75,
+          "cache_write_5m": 0.75,
+          "cache_write_1h": 0.75,
+          "cache_read": 0.075
+        },
+        "gemini-3.8-flash": {
+          "input": 0.75,
+          "output": 3.75,
+          "cache_write_5m": 0.75,
+          "cache_write_1h": 0.75,
+          "cache_read": 0.075
+        }
+      }
+    },
     {
       "effective_until": "2026-07-30T00:00:00Z",
       "codex_models_usd_per_mtok": {

@@ -164,4 +164,46 @@ final class PricingHistoryTests: XCTestCase {
         XCTAssertEqual(PricingEngine.catalogFingerprint(original), PricingEngine.catalogFingerprint(original))
         XCTAssertNotEqual(PricingEngine.catalogFingerprint(original), PricingEngine.catalogFingerprint(Data("new catalog".utf8)))
     }
+
+    func testGPT61SolCostsUseOwnCachePriceAcrossCatalogsAndVariants() {
+        for model in ["gpt-6.1-sol", "gpt-6.1-sol-2026-09-29", "gpt-6.1-sol[1m]"] {
+            let timestamp = date("2026-09-29T12:00:00Z")
+            for (tier, expected) in [("default", 1.638), ("fast", 3.276), ("PRIORITY", 3.276)] {
+                let cost = PricingEngine.shared.calculateCodexCNY(input: 100_000, cachedInput: 40_000,
+                    cacheWriteInput: 20_000, output: 10_000, reasoning: 5_000,
+                    model: model, serviceTier: tier, at: timestamp)
+                XCTAssertEqual(cost, expected, accuracy: 0.000_001, "\(model) \(tier)")
+            }
+            let usage = UsageRecord.TokenUsage(input: 40_000, output: 10_000,
+                cacheWrite5m: 10_000, cacheWrite1h: 10_000, cacheRead: 40_000)
+            XCTAssertEqual(PricingEngine.shared.calculateCNY(usage: usage, model: model, at: timestamp),
+                           1.638, accuracy: 0.000_001, model)
+        }
+        let oldCost = PricingEngine.shared.calculateCodexCNY(input: 100_000, cachedInput: 40_000,
+            cacheWriteInput: 20_000, output: 10_000, reasoning: 5_000,
+            model: "gpt-6-sol", serviceTier: "default", at: date("2026-09-29T12:00:00Z"))
+        XCTAssertEqual(oldCost, 1.666, accuracy: 0.000_001)
+    }
+
+    func testGPT61SolLongContextCostsIncludeCachedAndWrittenInput() {
+        for (input, expected) in [(272_000, 0.1904), (272_001, 0.3808014)] {
+            let codex = PricingEngine.shared.calculateCodexCNY(input: input, cachedInput: input,
+                cacheWriteInput: 0, output: 0, reasoning: 0,
+                model: "gpt-6.1-sol", serviceTier: "default")
+            let usage = UsageRecord.TokenUsage(input: 0, output: 0, cacheWrite5m: 0,
+                cacheWrite1h: 0, cacheRead: input)
+            XCTAssertEqual(codex, expected, accuracy: 0.000_001)
+            XCTAssertEqual(PricingEngine.shared.calculateCNY(usage: usage, model: "gpt-6.1-sol"),
+                           expected, accuracy: 0.000_001)
+        }
+        let usage = UsageRecord.TokenUsage(input: 100_000, output: 10_000,
+            cacheWrite5m: 50_000, cacheWrite1h: 50_000, cacheRead: 100_000)
+        XCTAssertEqual(PricingEngine.shared.calculateCNY(usage: usage, model: "gpt-6.1-sol"),
+                       7.49, accuracy: 0.000_001)
+        for (tier, expected) in [("default", 7.49), ("fast", 14.98)] {
+            XCTAssertEqual(PricingEngine.shared.calculateCodexCNY(input: 300_000, cachedInput: 100_000,
+                cacheWriteInput: 100_000, output: 10_000, reasoning: 5_000,
+                model: "gpt-6.1-sol", serviceTier: tier), expected, accuracy: 0.000_001)
+        }
+    }
 }

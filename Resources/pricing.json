@@ -8,15 +8,16 @@
     "qwen_pricing_source": "https://help.aliyun.com/zh/model-studio/model-pricing",
     "glm_pricing_source": "https://docs.bigmodel.cn/cn/guide/start/pricing",
     "deepseek_pricing_source": "https://api-docs.deepseek.com/quick_start/pricing",
-    "last_updated": "2026-09-29",
+    "last_updated": "2026-10-02",
     "note": "Official on-demand API rates, including the publicly advertised GPT-5.6 Sol promotion (at least through 2026-11-21); no automatic expiry is assumed. Sonnet 5 remains $2/$10. Batch/Flex, regional uplifts, and time-based cache storage are excluded. USD uses configured 7.0 CNY conversion. Fast/priority use API rates from 2026-07-30; earlier estimates are preserved in price_history.",
     "openai_changelog_source": "https://developers.openai.com/api/docs/changelog",
     "openai_fast_source": "https://developers.openai.com/api/docs/guides/fast-mode",
+    "gpt_61_sol_source": "https://developers.openai.com/api/docs/models/gpt-6.1-sol",
     "claude_changelog_source": "https://platform.claude.com/docs/en/release-notes/overview",
     "qwen_cache_source": "https://bailian.console.aliyun.com/",
     "pricing_audit": "docs/pricing-2026-09-29.md",
     "provider_last_verified": {
-      "openai": "2026-09-29",
+      "openai": "2026-10-02",
       "anthropic": "2026-09-29",
       "google": "2026-09-29",
       "qwen": "2026-09-29",
@@ -26,6 +27,19 @@
     "history_note": "price_history preserves prior catalog rates for records strictly before each effective_until (exclusive). Official changelog dates: Terra/Luna and Fast on 2026-07-30; Sol on 2026-08-21. Sources give dates, not exact instants; boundaries use 00:00 UTC. No verified history is available before the previous catalog; its rates remain the baseline. New model IDs use their own prices even for historical records, correcting former fallback estimates."
   },
   "models_usd_per_mtok": {
+    "gpt-6.1-sol": {
+      "input": 2,
+      "output": 10,
+      "cache_write_5m": 2.5,
+      "cache_write_1h": 2.5,
+      "cache_read": 0.1,
+      "long_context_threshold": 272000,
+      "long_input": 4,
+      "long_output": 15,
+      "long_cache_write_5m": 5,
+      "long_cache_write_1h": 5,
+      "long_cache_read": 0.2
+    },
     "claude-sonnet-5-5": {
       "input": 2,
       "output": 10,
@@ -465,6 +479,21 @@
   },
   "fallback_model": "qwen3.7-max",
   "codex_models_usd_per_mtok": {
+    "gpt-6.1-sol": {
+      "input": 2,
+      "cached_input": 0.1,
+      "cache_write": 2.5,
+      "output": 10,
+      "long_context_threshold": 272000,
+      "long_input": 4,
+      "long_cached_input": 0.2,
+      "long_cache_write": 5,
+      "long_output": 15,
+      "service_tier_multipliers": {
+        "fast": 2,
+        "priority": 2
+      }
+    },
     "gpt-6-sol": {
       "input": 2,
       "cached_input": 0.2,

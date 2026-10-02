@@ -64,7 +64,7 @@ To create a release bundle without installing anything or changing `launchctl` s
 bash scripts/package.sh --arch universal --output-dir dist
 ```
 
-This produces `dist/TokenMeter.app` and `dist/TokenMeter-v0.2.5-macos-universal.zip` without writing to `/Applications`.
+This produces `dist/TokenMeter.app` and `dist/TokenMeter-v0.2.6-macos-universal.zip` without writing to `/Applications`.
 
 ## Signing, notarization, and Gatekeeper
 
@@ -116,6 +116,8 @@ The September 5, 2026 catalog adds GPT-6 Astra and Claude Fable/Mythos 5.1. GPT-
 The September 23, 2026 catalog adds Claude Opus 5.5 ($4 input / $20 output / $0.20 cache read / $5 5m cache write / $8 1h cache write per million tokens), GPT-6 Sol ($2 input / $10 output / $0.20 cached input / $2.50 cache write), and GPT-6 Luna ($0.10 / $0.50 / $0.01 / $0.125). GPT-6 Sol/Luna use long-context rates above 272K input tokens and 2× API Fast/Priority rates in Codex. Opus 5.5 uses standard rates throughout its context window. Sources: [Anthropic pricing](https://platform.claude.com/docs/en/about-claude/pricing), [OpenAI pricing](https://developers.openai.com/api/docs/pricing), [GPT-6 Sol](https://developers.openai.com/api/docs/models/gpt-6-sol), and [GPT-6 Luna](https://developers.openai.com/api/docs/models/gpt-6-luna).
 
 The September 29, 2026 catalog adds Sonnet 5.5, Gemini 3.7/3.8 Flash, Qwen3.8 and GLM-5.3 mappings. Gemini promotions and DeepSeek peak/off-peak prices now follow each request's timestamp. Existing OpenAI/Anthropic rates, fallback choices, and historical revisions are retained. Newly recognized model IDs are recalculated at their own rates instead of their previous fallback estimates. See the [pricing audit](docs/pricing-2026-09-29.md) for rates, sources and known estimation boundaries.
+
+The October 2, 2026 catalog adds GPT-6.1 Sol to both the general and Codex catalogs: $2 input / $0.10 cache read / $2.50 cache write / $10 output per million tokens. Above 272K input tokens, the full request uses $4 / $0.20 / $5 / $15. Codex Fast/Priority use 2× these API rates. GPT-6 Sol retains its original $0.20 short-context cached-input price, and existing historical revisions are unchanged. Previously unrecognized GPT-6.1 Sol records are recalculated at their own prices when cost caches rebuild. Sources: [OpenAI pricing](https://developers.openai.com/api/docs/pricing) and [GPT-6.1 Sol](https://developers.openai.com/api/docs/models/gpt-6.1-sol).
 
 `price_history` stores prior rates with exclusive `effective_until` cutoffs. Claude, Codex, and OpenCode pass each usage record's timestamp to the pricing engine; the earliest matching cutoff is selected after resolving the exact model or longest variant prefix. Only models listed in a revision are overridden, so a new model never inherits an unrelated old fallback.
 

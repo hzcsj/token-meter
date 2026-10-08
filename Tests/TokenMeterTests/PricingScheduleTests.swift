@@ -14,7 +14,8 @@ final class PricingScheduleTests: XCTestCase {
     func testNewMappingsAndVariants() throws {
         let pricing = try catalog()
         for (model, input, output, read, write) in [
-            ("claude-sonnet-5-5", 2.0, 10.0, 0.2, 2.5),
+            ("claude-sonnet-5-5", 2.0, 10.0, 0.1, 2.5),
+            ("claude-haiku-5-5", 0.1, 0.5, 0.01, 0.125),
             ("qwen3.8-max", 12, 36, 1, 15),
             ("qwen3.8-flash", 0.8, 2.7, 0.1, 1.25),
             ("qwen3.8-2.4t-a95b", 12, 36, 1, 15),
@@ -54,6 +55,43 @@ final class PricingScheduleTests: XCTestCase {
         let now = Date()
         XCTAssertEqual(pricing.findModelPrice("gemini-3.8-flash").input,
                        pricing.findModelPrice("gemini-3.8-flash", at: now).input)
+    }
+
+    func testHaiku55ContextTierIncludesEveryInputPartition() throws {
+        let pricing = try catalog()
+        for model in ["claude-haiku-5-5", "claude-haiku-5-5-20261007", "claude-haiku-5-5[1m]"] {
+            let price = pricing.findModelPrice(model, at: date("2026-10-07T12:00:00Z"))
+            let short = price.effectiveRates(inputTokens: 100_000)
+            XCTAssertEqual(short.input, 0.1)
+            XCTAssertEqual(short.output, 0.5)
+            XCTAssertEqual(short.cacheWrite5m, 0.125)
+            XCTAssertEqual(short.cacheWrite1h, 0.2)
+            XCTAssertEqual(short.cacheRead, 0.01)
+            let long = price.effectiveRates(inputTokens: 100_001)
+            XCTAssertEqual(long.input, 0.5)
+            XCTAssertEqual(long.output, 2.5)
+            XCTAssertEqual(long.cacheWrite5m, 0.625)
+            XCTAssertEqual(long.cacheWrite1h, 1)
+            XCTAssertEqual(long.cacheRead, 0.05)
+            for (fresh, expected) in [(20_000, 0.0973), (20_001, 0.4865035)] {
+                let usage = UsageRecord.TokenUsage(input: fresh, output: 10_000,
+                    cacheWrite5m: 20_000, cacheWrite1h: 20_000, cacheRead: 40_000)
+                XCTAssertEqual(PricingEngine.shared.calculateCNY(usage: usage, model: model),
+                               expected, accuracy: 0.000001, model)
+            }
+            for (cached, expected) in [(100_000, 0.007), (100_001, 0.03500035)] {
+                let usage = UsageRecord.TokenUsage(input: 0, output: 0,
+                    cacheWrite5m: 0, cacheWrite1h: 0, cacheRead: cached)
+                XCTAssertEqual(PricingEngine.shared.calculateCNY(usage: usage, model: model),
+                               expected, accuracy: 0.000001, model)
+            }
+            // Output tokens do not move a short prompt into the long-input tier.
+            let usage = UsageRecord.TokenUsage(input: 0, output: 128_000,
+                cacheWrite5m: 0, cacheWrite1h: 0, cacheRead: 100_000)
+            XCTAssertEqual(PricingEngine.shared.calculateCNY(usage: usage, model: model),
+                           0.455, accuracy: 0.000001, model)
+        }
+        XCTAssertEqual(pricing.findModelPrice("claude-haiku-4-5").input, 1)
     }
 
     func testDeepSeekPeakBoundariesUseUTC() throws {

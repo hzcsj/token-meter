@@ -165,6 +165,52 @@ final class PricingHistoryTests: XCTestCase {
         XCTAssertNotEqual(PricingEngine.catalogFingerprint(original), PricingEngine.catalogFingerprint(Data("new catalog".utf8)))
     }
 
+    func testSonnet55CacheDiscountPreservesHistoricalCost() throws {
+        var pricing = try catalog()
+        pricing.priceHistory = pricing.priceHistory?.reversed()
+        let restored = try JSONDecoder().decode(Pricing.self, from: JSONEncoder().encode(pricing))
+        let usage = UsageRecord.TokenUsage(input: 100_000, output: 10_000,
+            cacheWrite5m: 20_000, cacheWrite1h: 10_000, cacheRead: 200_000)
+        for model in ["claude-sonnet-5-5", "claude-sonnet-5-5-20260928", "claude-sonnet-5-5[1m]"] {
+            for (timestamp, read, cost) in [
+                ("2026-10-06T23:59:59Z", 0.2, 3.01),
+                ("2026-10-07T00:00:00Z", 0.1, 2.87),
+                ("2026-10-07T08:00:00+08:00", 0.1, 2.87),
+            ] {
+                let price = restored.findModelPrice(model, at: date(timestamp))
+                XCTAssertEqual(price.cacheRead, read, model)
+                XCTAssertEqual(price.input, 2)
+                XCTAssertEqual(price.output, 10)
+                XCTAssertEqual(price.cacheWrite5m, 2.5)
+                XCTAssertEqual(price.cacheWrite1h, 4)
+                XCTAssertEqual(PricingEngine.shared.calculateCNY(usage: usage, model: model,
+                    at: date(timestamp)), cost, accuracy: 0.000001, model)
+            }
+        }
+        XCTAssertEqual(restored.findModelPrice("claude-sonnet-5").cacheRead, 0.2)
+    }
+
+    func testAstraUltrafastUsesAPIPriceOnlyForExplicitTier() throws {
+        let pricing = try catalog()
+        for model in ["gpt-6-astra", "gpt-6-astra-2026-09-03", "gpt-6-astra[1m]"] {
+            let old = pricing.findCodexModelPrice(model, at: date("2026-09-28T23:59:59Z"))
+            XCTAssertEqual(old.serviceTierMultiplier("ultrafast"), 1)
+            for (tier, short, long) in [
+                ("default", 8.33, 38.15), ("fast", 16.66, 76.3),
+                ("priority", 16.66, 76.3), ("ULTRAFAST", 49.98, 228.9),
+            ] {
+                let timestamp = date("2026-09-29T00:00:00Z")
+                XCTAssertEqual(PricingEngine.shared.calculateCodexCNY(input: 100_000,
+                    cachedInput: 40_000, cacheWriteInput: 20_000, output: 10_000, reasoning: 5_000,
+                    model: model, serviceTier: tier, at: timestamp), short, accuracy: 0.000001)
+                XCTAssertEqual(PricingEngine.shared.calculateCodexCNY(input: 300_000,
+                    cachedInput: 100_000, cacheWriteInput: 100_000, output: 10_000, reasoning: 5_000,
+                    model: model, serviceTier: tier, at: timestamp), long, accuracy: 0.000001)
+            }
+        }
+        XCTAssertEqual(pricing.findCodexModelPrice("gpt-6.1-sol").serviceTierMultiplier("ultrafast"), 1)
+    }
+
     func testGPT61SolCostsUseOwnCachePriceAcrossCatalogsAndVariants() {
         for model in ["gpt-6.1-sol", "gpt-6.1-sol-2026-09-29", "gpt-6.1-sol[1m]"] {
             let timestamp = date("2026-09-29T12:00:00Z")

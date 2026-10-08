@@ -64,7 +64,7 @@ To create a release bundle without installing anything or changing `launchctl` s
 bash scripts/package.sh --arch universal --output-dir dist
 ```
 
-This produces `dist/TokenMeter.app` and `dist/TokenMeter-v0.2.6-macos-universal.zip` without writing to `/Applications`.
+This produces `dist/TokenMeter.app` and `dist/TokenMeter-v0.2.7-macos-universal.zip` without writing to `/Applications`.
 
 ## Signing, notarization, and Gatekeeper
 
@@ -105,7 +105,7 @@ Model prices are defined in `Resources/pricing.json`:
 - `models_usd_per_mtok` contains Claude, Gemini, Qwen, GLM, DeepSeek, and other model rates; CNY entries declare `currency: "CNY"`.
 - `codex_models_usd_per_mtok` contains Codex/GPT rates.
 - `long_context_threshold` and `long_*` contain optional long-context rates.
-- `cache_write` and `service_tier_multipliers` describe Codex cache writes and per-model `fast`/`priority` rates.
+- `cache_write` and `service_tier_multipliers` describe Codex cache writes and per-model `fast`/`priority`/`ultrafast` rates.
 
 Virtual costs use official on-demand API rates, including publicly advertised model-wide pricing such as the GPT-5.6 Sol promotion (available at least through November 21, 2026; no automatic expiry is assumed). Batch/Flex discounts, regional uplifts, and time-based cache-storage charges are excluded. Sonnet 5 remains $2/$10 per million input/output tokens; its planned September increase was canceled. Models whose names contain `dogfooding` are counted but remain free.
 
@@ -118,6 +118,8 @@ The September 23, 2026 catalog adds Claude Opus 5.5 ($4 input / $20 output / $0.
 The September 29, 2026 catalog adds Sonnet 5.5, Gemini 3.7/3.8 Flash, Qwen3.8 and GLM-5.3 mappings. Gemini promotions and DeepSeek peak/off-peak prices now follow each request's timestamp. Existing OpenAI/Anthropic rates, fallback choices, and historical revisions are retained. Newly recognized model IDs are recalculated at their own rates instead of their previous fallback estimates. See the [pricing audit](docs/pricing-2026-09-29.md) for rates, sources and known estimation boundaries.
 
 The October 2, 2026 catalog adds GPT-6.1 Sol to both the general and Codex catalogs: $2 input / $0.10 cache read / $2.50 cache write / $10 output per million tokens. Above 272K input tokens, the full request uses $4 / $0.20 / $5 / $15. Codex Fast/Priority use 2× these API rates. GPT-6 Sol retains its original $0.20 short-context cached-input price, and existing historical revisions are unchanged. Previously unrecognized GPT-6.1 Sol records are recalculated at their own prices when cost caches rebuild. Sources: [OpenAI pricing](https://developers.openai.com/api/docs/pricing) and [GPT-6.1 Sol](https://developers.openai.com/api/docs/models/gpt-6.1-sol).
+
+The October 8, 2026 catalog adds Haiku 5.5, including its higher rates for prompts over 100K tokens, and applies Sonnet 5.5's October 7 cache-read reduction from $0.20 to $0.10 per million tokens. Older Sonnet records keep their original rates. Codex GPT-6 Astra records explicitly marked `ultrafast` use 6× API rates from its September 29 launch; Standard and Fast remain unchanged. See the [latest pricing audit](docs/pricing-2026-10-08.md) for provider checks and estimation boundaries.
 
 `price_history` stores prior rates with exclusive `effective_until` cutoffs. Claude, Codex, and OpenCode pass each usage record's timestamp to the pricing engine; the earliest matching cutoff is selected after resolving the exact model or longest variant prefix. Only models listed in a revision are overridden, so a new model never inherits an unrelated old fallback.
 

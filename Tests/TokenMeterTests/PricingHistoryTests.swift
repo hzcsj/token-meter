@@ -208,7 +208,34 @@ final class PricingHistoryTests: XCTestCase {
                     model: model, serviceTier: tier, at: timestamp), long, accuracy: 0.000001)
             }
         }
-        XCTAssertEqual(pricing.findCodexModelPrice("gpt-6.1-sol").serviceTierMultiplier("ultrafast"), 1)
+        XCTAssertEqual(pricing.findCodexModelPrice("gpt-6-sol").serviceTierMultiplier("ultrafast"), 1)
+    }
+
+    func testGPT61SolUltrafastLaunchPreservesHistoricalCosts() throws {
+        var pricing = try catalog()
+        pricing.priceHistory = pricing.priceHistory?.reversed()
+        let restored = try JSONDecoder().decode(Pricing.self, from: JSONEncoder().encode(pricing))
+        for model in ["gpt-6.1-sol", "gpt-6.1-sol-2026-09-29", "gpt-6.1-sol[1m]"] {
+            for (time, multiplier, short, long) in [
+                ("2026-10-07T23:59:59Z", 1.0, 1.638, 7.49),
+                ("2026-10-08T00:00:00Z", 6.0, 9.828, 44.94),
+                ("2026-10-08T08:00:00+08:00", 6.0, 9.828, 44.94),
+            ] {
+                let timestamp = date(time)
+                let price = restored.findCodexModelPrice(model, at: timestamp)
+                XCTAssertEqual(price.serviceTierMultiplier("ULTRAFAST"), multiplier)
+                XCTAssertEqual(price.serviceTierMultiplier(""), 1)
+                XCTAssertEqual(price.serviceTierMultiplier("default"), 1)
+                XCTAssertEqual(price.serviceTierMultiplier("fast"), 2)
+                XCTAssertEqual(price.serviceTierMultiplier("priority"), 2)
+                XCTAssertEqual(PricingEngine.shared.calculateCodexCNY(input: 100_000,
+                    cachedInput: 40_000, cacheWriteInput: 20_000, output: 10_000, reasoning: 5_000,
+                    model: model, serviceTier: "ULTRAFAST", at: timestamp), short, accuracy: 0.000001)
+                XCTAssertEqual(PricingEngine.shared.calculateCodexCNY(input: 300_000,
+                    cachedInput: 100_000, cacheWriteInput: 100_000, output: 10_000, reasoning: 5_000,
+                    model: model, serviceTier: "ultrafast", at: timestamp), long, accuracy: 0.000001)
+            }
+        }
     }
 
     func testGPT61SolCostsUseOwnCachePriceAcrossCatalogsAndVariants() {

@@ -40,7 +40,7 @@ final class PricingScheduleTests: XCTestCase {
 
     func testGeminiIntroductoryPricesExpireByEventTime() throws {
         let pricing = try catalog()
-        for model in ["gemini-3.6-flash", "gemini-3.7-flash", "gemini-3.8-flash"] {
+        for model in ["gemini-3.5-flash", "gemini-3.6-flash", "gemini-3.7-flash", "gemini-3.8-flash"] {
             let promo = pricing.findModelPrice(model, at: date("2026-12-31T23:59:59Z"))
             let standard = pricing.findModelPrice(model, at: date("2027-01-01T00:00:00Z"))
             XCTAssertEqual(promo.input, 0.75)
@@ -55,6 +55,33 @@ final class PricingScheduleTests: XCTestCase {
         let now = Date()
         XCTAssertEqual(pricing.findModelPrice("gemini-3.8-flash").input,
                        pricing.findModelPrice("gemini-3.8-flash", at: now).input)
+    }
+
+    func testGemini35MigrationPreservesOldCostsAndDoesNotRepriceFlashLite() throws {
+        var pricing = try catalog()
+        pricing.priceHistory = pricing.priceHistory?.reversed()
+        let restored = try JSONDecoder().decode(Pricing.self, from: JSONEncoder().encode(pricing))
+        let usage = UsageRecord.TokenUsage(input: 100_000, output: 10_000,
+            cacheWrite5m: 20_000, cacheWrite1h: 10_000, cacheRead: 200_000)
+        for (time, input, output, cost) in [
+            ("2026-10-07T23:59:59Z", 1.5, 9.0, 2.205),
+            ("2026-10-08T00:00:00Z", 0.75, 3.75, 1.05),
+            ("2026-10-08T08:00:00+08:00", 0.75, 3.75, 1.05),
+            ("2026-12-31T23:59:59Z", 0.75, 3.75, 1.05),
+            ("2027-01-01T00:00:00Z", 1.5, 7.5, 2.10),
+        ] {
+            let timestamp = date(time)
+            let price = restored.findModelPrice("gemini-3.5-flash", at: timestamp)
+            XCTAssertEqual(price.input, input)
+            XCTAssertEqual(price.output, output)
+            XCTAssertEqual(PricingEngine.shared.calculateCNY(usage: usage,
+                model: "gemini-3.5-flash", at: timestamp), cost, accuracy: 0.000001)
+            for model in ["gemini-3.5-flash-lite", "gemini-3.5-flash-lite[1m]"] {
+                XCTAssertEqual(restored.findModelPrice(model, at: timestamp).output, 2.5)
+                XCTAssertEqual(PricingEngine.shared.calculateCNY(usage: usage,
+                    model: model, at: timestamp), 0.49, accuracy: 0.000001)
+            }
+        }
     }
 
     func testHaiku55ContextTierIncludesEveryInputPartition() throws {

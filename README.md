@@ -64,7 +64,7 @@ To create a release bundle without installing anything or changing `launchctl` s
 bash scripts/package.sh --arch universal --output-dir dist
 ```
 
-This produces `dist/TokenMeter.app` and `dist/TokenMeter-v0.2.7-macos-universal.zip` without writing to `/Applications`.
+This produces `dist/TokenMeter.app` and `dist/TokenMeter-v0.2.8-macos-universal.zip` without writing to `/Applications`.
 
 ## Signing, notarization, and Gatekeeper
 
@@ -119,7 +119,9 @@ The September 29, 2026 catalog adds Sonnet 5.5, Gemini 3.7/3.8 Flash, Qwen3.8 an
 
 The October 2, 2026 catalog adds GPT-6.1 Sol to both the general and Codex catalogs: $2 input / $0.10 cache read / $2.50 cache write / $10 output per million tokens. Above 272K input tokens, the full request uses $4 / $0.20 / $5 / $15. Codex Fast/Priority use 2× these API rates. GPT-6 Sol retains its original $0.20 short-context cached-input price, and existing historical revisions are unchanged. Previously unrecognized GPT-6.1 Sol records are recalculated at their own prices when cost caches rebuild. Sources: [OpenAI pricing](https://developers.openai.com/api/docs/pricing) and [GPT-6.1 Sol](https://developers.openai.com/api/docs/models/gpt-6.1-sol).
 
-The October 8, 2026 catalog adds Haiku 5.5, including its higher rates for prompts over 100K tokens, and applies Sonnet 5.5's October 7 cache-read reduction from $0.20 to $0.10 per million tokens. Older Sonnet records keep their original rates. Codex GPT-6 Astra records explicitly marked `ultrafast` use 6× API rates from its September 29 launch; Standard and Fast remain unchanged. See the [latest pricing audit](docs/pricing-2026-10-08.md) for provider checks and estimation boundaries.
+The October 8, 2026 catalog adds Haiku 5.5, including its higher rates for prompts over 100K tokens, and applies Sonnet 5.5's October 7 cache-read reduction from $0.20 to $0.10 per million tokens. Older Sonnet records keep their original rates. Codex GPT-6 Astra records explicitly marked `ultrafast` use 6× API rates from its September 29 launch; Standard and Fast remain unchanged. See the [October 8 pricing audit](docs/pricing-2026-10-08.md) for provider checks and estimation boundaries.
+
+The October 11, 2026 catalog adds GPT-6.1 Sol's explicit Ultrafast tier at 6× standard API rates from October 8. Gemini 3.5 Flash follows its October 8 automatic migration to 3.6: $0.75 input / $3.75 output / $0.075 cache read per million tokens through December 31, then $1.50 / $7.50 / $0.15 from January 1, 2027. Pre-migration Gemini records and pre-launch Sol tier estimates retain the complete previous entries. Standard/Fast Sol prices and Gemini Flash-Lite are unchanged. See the [latest pricing audit](docs/pricing-2026-10-11.md) for sources and scope.
 
 `price_history` stores prior rates with exclusive `effective_until` cutoffs. Claude, Codex, and OpenCode pass each usage record's timestamp to the pricing engine; the earliest matching cutoff is selected after resolving the exact model or longest variant prefix. Only models listed in a revision are overridden, so a new model never inherits an unrelated old fallback.
 

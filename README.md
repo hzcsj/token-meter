@@ -64,7 +64,7 @@ To create a release bundle without installing anything or changing `launchctl` s
 bash scripts/package.sh --arch universal --output-dir dist
 ```
 
-This produces `dist/TokenMeter.app` and `dist/TokenMeter-v0.2.8-macos-universal.zip` without writing to `/Applications`.
+This produces `dist/TokenMeter.app` and `dist/TokenMeter-v0.2.9-macos-universal.zip` without writing to `/Applications`.
 
 ## Signing, notarization, and Gatekeeper
 
@@ -95,6 +95,8 @@ Every five minutes TokenMeter:
 5. Updates the menu bar summary, detailed history, and Codex quota windows.
 
 Set `OPENCODE_DB_PATH` to override the default OpenCode database location. Missing, corrupt, or incompatible rows are skipped without preventing the other sources from loading.
+
+On startup, the last complete local-usage summary is restored immediately while scans refresh in the background. Summary snapshots are keyed by the bundled pricing catalog, so an old-price summary is never reused after a pricing change. First launches and missing/corrupt snapshots show a loading row rather than hiding usage or displaying a false zero; completed empty scans show an empty state. Incremental caches and summary snapshots are saved atomically. Open menus keep their current rows until closed to preserve menu tracking and settings interactions.
 
 Codex quotas refresh separately every minute and on wake/menu open (debounced to 30 seconds), using the installed Codex/ChatGPT desktop app or Codex CLI. Both the nested `codex-cli/CodexCLI.app` layout and legacy desktop layouts are discovered on every attempt, including under launchd's minimal PATH. Only the official `codex` bucket is selected; auxiliary/Spark buckets cannot replace it. A successful live read takes priority. If a read fails, a newer valid local main-bucket observation with the same plan can replace the cached observation, including its entire set of reset windows. Old caches cannot permanently mask new local records. Signed-out, API-key-only, Free, and Go accounts show usage without quotas or login prompts; logs alone do not establish an active subscription. Fixed error categories are recorded in macOS unified logging without account data or raw RPC responses. Local usage tracking does not require Codex authentication or a subscription.
 

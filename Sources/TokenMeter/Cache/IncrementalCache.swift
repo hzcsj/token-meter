@@ -67,7 +67,7 @@ final class IncrementalCache<T: Codable> {
         encoder.dateEncodingStrategy = .secondsSince1970
 
         if let data = try? encoder.encode(cache) {
-            try? data.write(to: cacheFile)
+            try? data.write(to: cacheFile, options: .atomic)
         }
     }
 

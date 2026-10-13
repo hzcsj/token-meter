@@ -42,6 +42,7 @@ struct MenuBuilder {
         codexUsage: UsageSummary?,
         openCodeUsage: UsageSummary?,
         codexQuota: CodexQuota?,
+        isUsageLoading: Bool = false,
         settingsMenuItem: NSMenuItem? = nil
     ) -> NSMenu {
         let menu = NSMenu()
@@ -65,6 +66,10 @@ struct MenuBuilder {
 
         if let usage = mergedUsage {
             addLocalUsageSection(usage, sources: sourceSummaries, to: menu, columns: columns!)
+        } else {
+            addTextRow("📈 本地用量统计", color: .secondary, font: smallFont, to: menu)
+            addTextRow(isUsageLoading ? "正在读取本地用量…" : "暂无本地用量",
+                       color: .secondary, font: monoFont, to: menu)
         }
 
         if let settingsMenuItem {

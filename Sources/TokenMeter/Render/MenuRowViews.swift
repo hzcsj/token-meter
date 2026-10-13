@@ -170,16 +170,18 @@ final class MenuQuotaRowView: NSView {
     override var allowsVibrancy: Bool { false }
 
     convenience init(left: String, right: String, font: NSFont, color: NSColor, contentWidth: CGFloat) {
+        let leftWidth = textWidth(left, font: font) + MenuLayout.safeMargin
+        let rightWidth = textWidth(right, font: font) + MenuLayout.safeMargin
+        let minimumGap = textWidth("  ", font: font)
+        let contentWidth = max(contentWidth, leftWidth + minimumGap + rightWidth)
         let rowWidth = MenuLayout.leftPad + contentWidth + MenuLayout.rightPad
         let contentRight = MenuLayout.leftPad + contentWidth
 
         self.init(frame: NSRect(x: 0, y: 0, width: rowWidth, height: MenuLayout.rowHeight))
 
-        let leftWidth = textWidth(left, font: font) + MenuLayout.safeMargin
         addSubview(makeField(text: left, font: font, color: color,
                              x: MenuLayout.leftPad, width: leftWidth, alignment: .left))
 
-        let rightWidth = textWidth(right, font: font) + MenuLayout.safeMargin
         addSubview(makeField(text: right, font: font, color: color,
                              x: contentRight - rightWidth, width: rightWidth, alignment: .right))
     }

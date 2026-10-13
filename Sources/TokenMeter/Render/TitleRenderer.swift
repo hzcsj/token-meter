@@ -15,6 +15,10 @@ struct TitleRenderer {
         return renderLines([tokenStr, costStr])
     }
 
+    func renderLoading() -> NSImage {
+        renderLines(["统计中…"])
+    }
+
     // MARK: - Private
 
     private func renderLines(_ lines: [String]) -> NSImage {

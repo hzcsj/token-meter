@@ -1,5 +1,6 @@
 import AppKit
 
+@MainActor
 final class StatusBarManager: NSObject, NSMenuDelegate {
     static let shared = StatusBarManager()
 
@@ -13,24 +14,13 @@ final class StatusBarManager: NSObject, NSMenuDelegate {
         loginItemManager: loginItemManager
     )
 
-    private let claudeScanner = ClaudeUsageScanner()
-    private let codexScanner = CodexUsageScanner()
-    private let openCodeScanner = OpenCodeUsageScanner()
+    private let localUsageService = LocalUsageService()
     private let codexQuotaService = CodexQuotaService()
     private var liveCodexQuota: CodexQuotaReadResult = .unavailable
 
     private let refreshInterval: TimeInterval = 300
-    private let refreshDebounce: TimeInterval = 5
     private var timer: Timer?
     private var quotaTimer: Timer?
-
-    private var currentClaudeUsage: UsageSummary?
-    private var currentCodexUsage: UsageSummary?
-    private var currentOpenCodeUsage: UsageSummary?
-    private var currentCodexQuota: CodexQuota?
-
-    private var isRefreshing = false
-    private var lastRefreshAt: Date = .distantPast
 
     private override init() {
         let executableURL = Bundle.main.executableURL
@@ -60,14 +50,15 @@ final class StatusBarManager: NSObject, NSMenuDelegate {
             return
         }
 
+        renderUI()
         refreshIfNeeded(force: true)
         refreshQuota()
 
         timer = Timer.scheduledTimer(withTimeInterval: refreshInterval, repeats: true) { [weak self] _ in
-            self?.refreshIfNeeded(force: false)
+            Task { @MainActor in self?.refreshIfNeeded(force: false) }
         }
         quotaTimer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in
-            self?.refreshQuota()
+            Task { @MainActor in self?.refreshQuota() }
         }
         NSWorkspace.shared.notificationCenter.addObserver(
             self, selector: #selector(refreshQuota), name: NSWorkspace.didWakeNotification, object: nil
@@ -106,30 +97,10 @@ final class StatusBarManager: NSObject, NSMenuDelegate {
     }
 
     private func refreshIfNeeded(force: Bool) {
-        if !force && Date().timeIntervalSince(lastRefreshAt) < refreshDebounce {
-            return
-        }
-        guard !isRefreshing else { return }
-        isRefreshing = true
-
         Task {
-            await refreshAsync()
-        }
-    }
-
-    private func refreshAsync() async {
-        let claudeUsage = claudeScanner.scan()
-        let (codexUsage, codexQuota) = codexScanner.scan()
-        let openCodeUsage = openCodeScanner.scan()
-
-        await MainActor.run {
-            currentClaudeUsage = claudeUsage
-            currentCodexUsage = codexUsage
-            currentOpenCodeUsage = openCodeUsage
-            currentCodexQuota = codexQuota
-            lastRefreshAt = Date()
-            isRefreshing = false
-            renderUI()
+            if await localUsageService.refresh(force: force) {
+                renderUI()
+            }
         }
     }
 
@@ -137,15 +108,14 @@ final class StatusBarManager: NSObject, NSMenuDelegate {
         guard menuRenderGate.requestRender() else { return }
         guard let button = statusItem.button else { return }
 
-        let mergedUsage = menuBuilder.mergeUsage([
-            currentClaudeUsage,
-            currentCodexUsage,
-            currentOpenCodeUsage
-        ])
+        let snapshot = localUsageService.snapshot
+        let mergedUsage = menuBuilder.mergeUsage([snapshot?.claude, snapshot?.codex, snapshot?.openCode])
 
         let image: NSImage
         let todayStr = DateFormatter.yyyyMMdd.string(from: Date())
-        if let today = mergedUsage?.byDay.first, today.date == todayStr {
+        if localUsageService.isLoading {
+            image = titleRenderer.renderLoading()
+        } else if let today = mergedUsage?.byDay.first, today.date == todayStr {
             image = titleRenderer.renderLocalUsage(tokens: today.tokens, cost: today.costCNY)
         } else {
             image = titleRenderer.renderLocalUsage(tokens: 0, cost: 0)
@@ -156,10 +126,11 @@ final class StatusBarManager: NSObject, NSMenuDelegate {
 
         let settingsMenuItem = settingsMenuController.makeParentMenuItem()
         let menu = menuBuilder.build(
-            claudeUsage: currentClaudeUsage,
-            codexUsage: currentCodexUsage,
-            openCodeUsage: currentOpenCodeUsage,
-            codexQuota: displayedCodexQuota(live: liveCodexQuota, local: currentCodexQuota),
+            claudeUsage: snapshot?.claude,
+            codexUsage: snapshot?.codex,
+            openCodeUsage: snapshot?.openCode,
+            codexQuota: displayedCodexQuota(live: liveCodexQuota, local: snapshot?.codexQuota),
+            isUsageLoading: localUsageService.isLoading,
             settingsMenuItem: settingsMenuItem
         )
 

@@ -200,7 +200,7 @@ actor CodexQuotaService {
     private let cacheURL: URL
     private var snapshot: CodexQuotaSnapshot?
     private var noSubscription = false
-    private var lastAttempt: Date = .distantPast
+    private var refreshPolicy = CodexQuotaRefreshPolicy()
     private var fetching = false
     private var lastReadSucceeded = false
 
@@ -215,10 +215,11 @@ actor CodexQuotaService {
         }
     }
 
-    func refresh(now: Date = Date(), read: @escaping @Sendable () -> CodexQuotaReadResult = { CodexQuotaClient.read() }) async -> CodexQuotaReadResult {
-        guard !fetching, now.timeIntervalSince(lastAttempt) >= 30 else { return currentResult }
+    func refresh(trigger: CodexQuotaRefreshTrigger = .menu, isActive: Bool = false,
+                 now: Date = Date(), read: @escaping @Sendable () -> CodexQuotaReadResult = { CodexQuotaClient.read() }) async -> CodexQuotaReadResult {
+        guard !fetching, refreshPolicy.beginAttempt(trigger: trigger, isActive: isActive,
+                                                    noSubscription: noSubscription, now: now) else { return currentResult }
         fetching = true
-        lastAttempt = now
         let result = await Task.detached(priority: .utility) { read() }.value
         fetching = false
         switch result {

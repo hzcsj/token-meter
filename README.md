@@ -15,7 +15,7 @@ TokenMeter gives Claude Code, Codex, and OpenCode users one lightweight view of 
 - Tracks Claude Code usage from local JSONL session logs.
 - Tracks Codex usage and model-aware estimated cost from local sessions, including side and temporary chats found only in the local SQLite log database.
 - Reads OpenCode assistant usage from its local SQLite database, including live WAL data.
-- Refreshes the official Codex main quota every minute, independently of conversation completion, with separate quota windows and reset timing.
+- Refreshes the official Codex main quota every five minutes while locally active, every 30 minutes while idle, and on menu open with a shared 60-second debounce.
 - Aggregates daily, weekly, monthly, and all-time token counts, calls, and cost.
 - Breaks down mixed-source totals in field-level hover details.
 - Uses incremental caches for quick refreshes after the first scan.
@@ -64,7 +64,7 @@ To create a release bundle without installing anything or changing `launchctl` s
 bash scripts/package.sh --arch universal --output-dir dist
 ```
 
-This produces `dist/TokenMeter.app` and `dist/TokenMeter-v0.2.9-macos-universal.zip` without writing to `/Applications`.
+This produces `dist/TokenMeter.app` and `dist/TokenMeter-v0.2.10-macos-universal.zip` without writing to `/Applications`.
 
 ## Signing, notarization, and Gatekeeper
 
@@ -98,7 +98,9 @@ Set `OPENCODE_DB_PATH` to override the default OpenCode database location. Missi
 
 On startup, the last complete local-usage summary is restored immediately while scans refresh in the background. Summary snapshots are keyed by the bundled pricing catalog, so an old-price summary is never reused after a pricing change. First launches and missing/corrupt snapshots show a loading row rather than hiding usage or displaying a false zero; completed empty scans show an empty state. Incremental caches and summary snapshots are saved atomically. Open menus keep their current rows until closed to preserve menu tracking and settings interactions.
 
-Codex quotas refresh separately every minute and on wake/menu open (debounced to 30 seconds), using the installed Codex/ChatGPT desktop app or Codex CLI. Both the nested `codex-cli/CodexCLI.app` layout and legacy desktop layouts are discovered on every attempt, including under launchd's minimal PATH. Only the official `codex` bucket is selected; auxiliary/Spark buckets cannot replace it. A successful live read takes priority. If a read fails, a newer valid local main-bucket observation with the same plan can replace the cached observation, including its entire set of reset windows. Old caches cannot permanently mask new local records. Signed-out, API-key-only, Free, and Go accounts show usage without quotas or login prompts; logs alone do not establish an active subscription. Fixed error categories are recorded in macOS unified logging without account data or raw RPC responses. Local usage tracking does not require Codex authentication or a subscription.
+Codex quotas refresh separately every five minutes while active and every 30 minutes while idle, using the installed Codex/ChatGPT desktop app or Codex CLI. Activity is inferred locally from session-file modification times and recent thread-scoped inference/tool events in the read-only log database, with a five-minute lookback. This detection never starts a client or network request; a running desktop app or threadless account-client housekeeping does not count as activity. A one-minute local timer checks the schedule and keeps reset countdowns current. Startup performs one read; wake follows the active/idle cadence. Opening the menu requests a read on demand, with one rolling 60-second debounce shared by all triggers, including failures. In-flight reads are not duplicated.
+
+Both the nested `codex-cli/CodexCLI.app` layout and legacy desktop layouts are discovered on every attempt, including under launchd's minimal PATH. Only the official `codex` bucket is selected; auxiliary/Spark buckets cannot replace it. A successful live read takes priority. If a read fails, a newer valid local main-bucket observation with the same plan can replace the cached observation, including its entire set of reset windows. Old caches cannot permanently mask new local records. Signed-out, API-key-only, Free, and Go accounts show usage without quotas or login prompts; logs alone do not establish an active subscription. These accounts use the 30-minute background cadence even during local activity; menu-open checks can still detect a later normal login. Fixed error categories are recorded in macOS unified logging without account data or raw RPC responses. Local usage tracking does not require Codex authentication or a subscription.
 
 ## Pricing
 
@@ -123,7 +125,9 @@ The October 2, 2026 catalog adds GPT-6.1 Sol to both the general and Codex catal
 
 The October 8, 2026 catalog adds Haiku 5.5, including its higher rates for prompts over 100K tokens, and applies Sonnet 5.5's October 7 cache-read reduction from $0.20 to $0.10 per million tokens. Older Sonnet records keep their original rates. Codex GPT-6 Astra records explicitly marked `ultrafast` use 6× API rates from its September 29 launch; Standard and Fast remain unchanged. See the [October 8 pricing audit](docs/pricing-2026-10-08.md) for provider checks and estimation boundaries.
 
-The October 11, 2026 catalog adds GPT-6.1 Sol's explicit Ultrafast tier at 6× standard API rates from October 8. Gemini 3.5 Flash follows its October 8 automatic migration to 3.6: $0.75 input / $3.75 output / $0.075 cache read per million tokens through December 31, then $1.50 / $7.50 / $0.15 from January 1, 2027. Pre-migration Gemini records and pre-launch Sol tier estimates retain the complete previous entries. Standard/Fast Sol prices and Gemini Flash-Lite are unchanged. See the [latest pricing audit](docs/pricing-2026-10-11.md) for sources and scope.
+The October 11, 2026 catalog adds GPT-6.1 Sol's explicit Ultrafast tier at 6× standard API rates from October 8. Gemini 3.5 Flash follows its October 8 automatic migration to 3.6: $0.75 input / $3.75 output / $0.075 cache read per million tokens through December 31, then $1.50 / $7.50 / $0.15 from January 1, 2027. Pre-migration Gemini records and pre-launch Sol tier estimates retain the complete previous entries. Standard/Fast Sol prices and Gemini Flash-Lite are unchanged. See the [October 11 pricing audit](docs/pricing-2026-10-11.md) for sources and scope.
+
+The October 26, 2026 catalog adds Gemini 4 Argon: $2 input / $10 output / $0.10 implicit cache read per million tokens through November 30, then $4 / $20 / $0.20 from December 1. There is no separate long-context tier. Existing model entries and historical segments are unchanged. See the [latest pricing audit](docs/pricing-2026-10-26.md) for provider checks and estimation boundaries.
 
 `price_history` stores prior rates with exclusive `effective_until` cutoffs. Claude, Codex, and OpenCode pass each usage record's timestamp to the pricing engine; the earliest matching cutoff is selected after resolving the exact model or longest variant prefix. Only models listed in a revision are overridden, so a new model never inherits an unrelated old fallback.
 
@@ -145,6 +149,8 @@ bash -n scripts/*.sh
 ```
 
 Release metadata is centralized in `scripts/app-config.sh`. A Git tag must match the configured app version before the release workflow packages and retains its release assets. Publishing the public GitHub Release remains a separate, explicit step.
+
+Before every version update, recheck the catalog providers' official pricing and record the results in `docs/`, including releases primarily about fixes or performance. Bundle confirmed mapping/rate changes with dated historical protection. If no prices changed, leave the pricing JSON unchanged to avoid unnecessary cache rebuilds. This is a release-time check, not background network polling by the app; see `AGENTS.md`.
 
 ## Uninstall
 

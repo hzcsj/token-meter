@@ -57,6 +57,35 @@ final class PricingScheduleTests: XCTestCase {
                        pricing.findModelPrice("gemini-3.8-flash", at: now).input)
     }
 
+    func testGeminiArgonPromotionUsesEventTimeWithoutAContextSurcharge() throws {
+        let pricing = try catalog()
+        let restored = try JSONDecoder().decode(Pricing.self, from: JSONEncoder().encode(pricing))
+        let usage = UsageRecord.TokenUsage(input: 300_000, output: 100_000,
+            cacheWrite5m: 0, cacheWrite1h: 0, cacheRead: 600_000)
+        for model in ["gemini-4-argon", "gemini-4-argon-20261013", "gemini-4-argon[1m]"] {
+            for (timestamp, input, output, read, cost): (String, Double, Double, Double, Double) in [
+                ("2026-10-13T00:00:00Z", 2, 10, 0.1, 11.62),
+                ("2026-11-30T23:59:59Z", 2, 10, 0.1, 11.62),
+                ("2026-12-01T00:00:00Z", 4, 20, 0.2, 23.24),
+                ("2026-12-01T08:00:00+08:00", 4, 20, 0.2, 23.24),
+            ] {
+                let price = restored.findModelPrice(model, at: date(timestamp))
+                XCTAssertEqual(price.input, input)
+                XCTAssertEqual(price.output, output)
+                XCTAssertEqual(price.cacheRead, read)
+                XCTAssertEqual(price.cacheWrite5m, input)
+                XCTAssertEqual(price.cacheWrite1h, input)
+                XCTAssertNil(price.longContextThreshold)
+                XCTAssertEqual(price.effectiveRates(inputTokens: 900_000).input, input)
+                XCTAssertEqual(PricingEngine.shared.calculateCNY(usage: usage, model: model,
+                    at: date(timestamp)), cost, accuracy: 0.000001)
+            }
+        }
+        // Argon's promotion must not alter the separate Flash promotion.
+        XCTAssertEqual(restored.findModelPrice("gemini-3.8-flash", at: date("2026-12-01T00:00:00Z")).input, 0.75)
+        XCTAssertEqual(restored.findCodexModelPrice("gpt-6.1-sol").input, 2)
+    }
+
     func testGemini35MigrationPreservesOldCostsAndDoesNotRepriceFlashLite() throws {
         var pricing = try catalog()
         pricing.priceHistory = pricing.priceHistory?.reversed()

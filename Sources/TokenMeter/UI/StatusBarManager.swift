@@ -16,6 +16,7 @@ final class StatusBarManager: NSObject, NSMenuDelegate {
 
     private let localUsageService = LocalUsageService()
     private let codexQuotaService = CodexQuotaService()
+    private let codexActivityMonitor = CodexActivityMonitor()
     private var liveCodexQuota: CodexQuotaReadResult = .unavailable
 
     private let refreshInterval: TimeInterval = 300
@@ -52,16 +53,18 @@ final class StatusBarManager: NSObject, NSMenuDelegate {
 
         renderUI()
         refreshIfNeeded(force: true)
-        refreshQuota()
+        refreshQuota(trigger: .startup)
 
         timer = Timer.scheduledTimer(withTimeInterval: refreshInterval, repeats: true) { [weak self] _ in
             Task { @MainActor in self?.refreshIfNeeded(force: false) }
         }
         quotaTimer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in
-            Task { @MainActor in self?.refreshQuota() }
+            // This tick only inspects local activity and updates the countdown.
+            // The shared policy permits a network read every 5 or 30 minutes.
+            Task { @MainActor in self?.refreshQuota(trigger: .periodic) }
         }
         NSWorkspace.shared.notificationCenter.addObserver(
-            self, selector: #selector(refreshQuota), name: NSWorkspace.didWakeNotification, object: nil
+            self, selector: #selector(refreshQuotaAfterWake), name: NSWorkspace.didWakeNotification, object: nil
         )
     }
 
@@ -75,7 +78,7 @@ final class StatusBarManager: NSObject, NSMenuDelegate {
     func menuWillOpen(_ menu: NSMenu) {
         menuRenderGate.menuWillOpen()
         refreshIfNeeded(force: false)
-        refreshQuota()
+        refreshQuota(trigger: .menu)
     }
 
     func menuDidClose(_ menu: NSMenu) {
@@ -86,9 +89,14 @@ final class StatusBarManager: NSObject, NSMenuDelegate {
 
     // MARK: - Private
 
-    @objc private func refreshQuota() {
+    @objc private func refreshQuotaAfterWake() {
+        refreshQuota(trigger: .wake)
+    }
+
+    private func refreshQuota(trigger: CodexQuotaRefreshTrigger) {
         Task {
-            let result = await codexQuotaService.refresh()
+            let active = await codexActivityMonitor.isActive()
+            let result = await codexQuotaService.refresh(trigger: trigger, isActive: active)
             await MainActor.run {
                 liveCodexQuota = result
                 renderUI()

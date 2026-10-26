@@ -130,7 +130,7 @@ final class CodexQuotaClientTests: XCTestCase {
         let service = CodexQuotaService(cacheURL: file)
         _ = await service.refresh(now: now, read: { .noSubscription })
         _ = await service.refresh(now: now.addingTimeInterval(5), read: {
-            XCTFail("Must not start a second query within 30 seconds")
+            XCTFail("Must not start a second query within 60 seconds")
             return .unavailable
         })
     }

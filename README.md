@@ -64,7 +64,7 @@ To create a release bundle without installing anything or changing `launchctl` s
 bash scripts/package.sh --arch universal --output-dir dist
 ```
 
-This produces `dist/TokenMeter.app` and `dist/TokenMeter-v0.2.10-macos-universal.zip` without writing to `/Applications`.
+This produces `dist/TokenMeter.app` and `dist/TokenMeter-v0.2.11-macos-universal.zip` without writing to `/Applications`.
 
 ## Signing, notarization, and Gatekeeper
 
@@ -111,7 +111,7 @@ Model prices are defined in `Resources/pricing.json`:
 - `long_context_threshold` and `long_*` contain optional long-context rates.
 - `cache_write` and `service_tier_multipliers` describe Codex cache writes and per-model `fast`/`priority`/`ultrafast` rates.
 
-Virtual costs use official on-demand API rates, including publicly advertised model-wide pricing such as the GPT-5.6 Sol promotion (available at least through November 21, 2026; no automatic expiry is assumed). Batch/Flex discounts, regional uplifts, and time-based cache-storage charges are excluded. Sonnet 5 remains $2/$10 per million input/output tokens; its planned September increase was canceled. Models whose names contain `dogfooding` are counted but remain free.
+Virtual costs use official on-demand API rates, including publicly advertised model-wide pricing such as the GPT-5.6 Sol promotion (until November 30, 2026; post-promotion rates require re-verification, so no automatic reversion is inferred). Batch/Flex discounts, regional uplifts, and time-based cache-storage charges are excluded. Sonnet 5 remains $2/$10 per million input/output tokens; its planned September increase was canceled. Models whose names contain `dogfooding` are counted but remain free.
 
 The September 5, 2026 catalog adds GPT-6 Astra and Claude Fable/Mythos 5.1. GPT-6 Astra costs $10 input / $1 cache read / $12.50 cache write / $50 output per million tokens, with long-context rates above 272K input tokens and 2× API Fast/Priority rates. Fable/Mythos 5.1 cost $10 input / $50 output with $0.25 cache reads; their 5m/1h cache-write rates remain $12.50/$20. Sources: [OpenAI pricing](https://developers.openai.com/api/docs/pricing), [OpenAI changelog](https://developers.openai.com/api/docs/changelog), and [Anthropic pricing](https://platform.claude.com/docs/en/about-claude/pricing).
 
@@ -127,7 +127,9 @@ The October 8, 2026 catalog adds Haiku 5.5, including its higher rates for promp
 
 The October 11, 2026 catalog adds GPT-6.1 Sol's explicit Ultrafast tier at 6× standard API rates from October 8. Gemini 3.5 Flash follows its October 8 automatic migration to 3.6: $0.75 input / $3.75 output / $0.075 cache read per million tokens through December 31, then $1.50 / $7.50 / $0.15 from January 1, 2027. Pre-migration Gemini records and pre-launch Sol tier estimates retain the complete previous entries. Standard/Fast Sol prices and Gemini Flash-Lite are unchanged. See the [October 11 pricing audit](docs/pricing-2026-10-11.md) for sources and scope.
 
-The October 26, 2026 catalog adds Gemini 4 Argon: $2 input / $10 output / $0.10 implicit cache read per million tokens through November 30, then $4 / $20 / $0.20 from December 1. There is no separate long-context tier. Existing model entries and historical segments are unchanged. See the [latest pricing audit](docs/pricing-2026-10-26.md) for provider checks and estimation boundaries.
+The October 26, 2026 catalog adds Gemini 4 Argon: $2 input / $10 output / $0.10 implicit cache read per million tokens through November 30, then $4 / $20 / $0.20 from December 1. There is no separate long-context tier. Existing model entries and historical segments are unchanged. See the [October 26 pricing audit](docs/pricing-2026-10-26.md) for provider checks and estimation boundaries.
+
+The November 6, 2026 catalog adds GPT-6.1 Terra to both general and Codex mappings: $1 input / $5 output / $0.05 cache read / $1.25 short cache write per million tokens. Above 272K input tokens, the full request uses $2 / $7.50 / $0.10 / $2.50. Explicit Codex Fast/Priority uses 2× API rates; no Ultrafast rate is inferred. Existing model prices and historical segments remain unchanged. See the [latest pricing audit](docs/pricing-2026-11-06.md) for official sources, provider rechecks and the updated GPT-5.6 Sol promotion notice.
 
 `price_history` stores prior rates with exclusive `effective_until` cutoffs. Claude, Codex, and OpenCode pass each usage record's timestamp to the pricing engine; the earliest matching cutoff is selected after resolving the exact model or longest variant prefix. Only models listed in a revision are overridden, so a new model never inherits an unrelated old fallback.
 

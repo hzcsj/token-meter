@@ -29,6 +29,10 @@ universal Codex rollout date.
   display subscription quotas for unsigned-in users.
 - Cache only stable file signatures. The v7 cache namespace rebuilds independently
   of old caches; no original files or previous caches are deleted.
+- Compare persisted timestamps with sub-microsecond tolerance to accommodate JSON
+  epoch conversion; file sizes still match exactly. This prevents unchanged
+  archives from being rescanned after a restart. Drain cache-decoding temporaries
+  immediately instead of retaining them through the subsequent scan.
 - Skip cache writes when neither entries nor cleanup results change. Parsing
   remains off the UI actor; timestamp formatters are reused within each file.
   Autorelease pools cover chunk reads, file parsing and aggregation so background
@@ -67,7 +71,13 @@ Post-fix spot checks stayed below 650 MiB RSS during scanning and dropped after
 completion, rather than growing by gigabytes. This is an observed sample, not
 a fixed memory ceiling for arbitrary rollout lines or history sizes.
 
-The broader regression run passed 129 tests and skipped two opt-in tests after
+After the timestamp round-trip fix, the installed app refreshed its persisted
+usage snapshot within about two seconds of a warm launch. A check 12 seconds
+after launch showed idle CPU and about 444 MiB RSS. The restored totals were
+approximately 27.43 billion Codex tokens and 29.75 billion combined tokens;
+these continue to grow with ongoing conversations.
+
+The broader regression run passed 130 tests and skipped two opt-in tests after
 excluding the pre-existing interactive submenu test
 `testRepeatedControlClicksDoNotEndTrackedSubmenu`. A full run still reproduced
 that test's two assertions previously documented in the November 6 release;

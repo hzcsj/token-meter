@@ -4,6 +4,12 @@ struct FileSignature: Codable, Equatable {
     let mtime: Date
     let size: UInt64
 
+    static func == (lhs: FileSignature, rhs: FileSignature) -> Bool {
+        // JSON epoch seconds lose sub-microsecond Date precision on round-trip.
+        // File size still matches exactly; real timestamp changes trigger a scan.
+        lhs.size == rhs.size && abs(lhs.mtime.timeIntervalSince(rhs.mtime)) < 0.000_001
+    }
+
     init?(url: URL) {
         do {
             let attrs = try FileManager.default.attributesOfItem(atPath: url.path)
@@ -33,7 +39,7 @@ final class IncrementalCache<T: Codable> {
         let cacheBase = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first!
         let cacheDir = directory ?? cacheBase.appendingPathComponent("token-meter", isDirectory: true)
         self.cacheFile = cacheDir.appendingPathComponent("\(name).json")
-        load()
+        autoreleasepool { load() }
     }
 
     func needsRescan(_ url: URL) -> Bool {

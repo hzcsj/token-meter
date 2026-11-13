@@ -36,7 +36,10 @@ struct JSONLStreamReader {
             var output = [UInt8](repeating: 0, count: chunkSize)
             var remaining = 1
             var readAny = false
-            while let data = try handle.read(upToCount: chunkSize), !data.isEmpty {
+            // Scope the file read itself, not only JSON parsing: FileHandle/Data
+            // bridging can otherwise accumulate autoreleased buffers on an actor.
+            while try autoreleasepool(invoking: { () throws -> Bool in
+                guard let data = try handle.read(upToCount: chunkSize), !data.isEmpty else { return false }
                 readAny = true
                 try data.withUnsafeBytes { inputBytes in
                     var input = ZSTD_inBuffer(src: inputBytes.baseAddress, size: data.count, pos: 0)
@@ -57,10 +60,15 @@ struct JSONLStreamReader {
                         if input.pos == before && written == 0 { break }
                     }
                 }
-            }
+                return true
+            }) {}
             guard readAny, remaining == 0 else { throw ReadError.truncatedArchive }
         } else {
-            while let data = try handle.read(upToCount: chunkSize), !data.isEmpty { try consume(data) }
+            while try autoreleasepool(invoking: { () throws -> Bool in
+                guard let data = try handle.read(upToCount: chunkSize), !data.isEmpty else { return false }
+                try consume(data)
+                return true
+            }) {}
         }
         if !pending.isEmpty { try autoreleasepool { try onLine(pending) } }
     }

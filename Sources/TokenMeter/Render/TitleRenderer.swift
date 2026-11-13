@@ -1,6 +1,7 @@
 import AppKit
 
 struct TitleRenderer {
+    static let loadingText = "Loading"
     private static let fontPt: CGFloat = 10
     private static let heightPt: CGFloat = 22
 
@@ -16,7 +17,7 @@ struct TitleRenderer {
     }
 
     func renderLoading() -> NSImage {
-        renderLines(["统计中…"])
+        renderLines([Self.loadingText])
     }
 
     // MARK: - Private

@@ -104,7 +104,7 @@ struct CodexUsageScanner {
                     break
                 }
                 guard let signature = FileSignature(url: url),
-                      let result = try? parseJSONL(url) else { continue }
+                      let result = try? autoreleasepool(invoking: { try parseJSONL(url) }) else { continue }
                 // Never mark a partially written or concurrently replaced file as cached.
                 if FileSignature(url: url) == signature {
                     cache.set(url, signature: signature, data: result)

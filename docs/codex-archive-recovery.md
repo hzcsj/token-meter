@@ -31,6 +31,8 @@ universal Codex rollout date.
   of old caches; no original files or previous caches are deleted.
 - Skip cache writes when neither entries nor cleanup results change. Parsing
   remains off the UI actor; timestamp formatters are reused within each file.
+  Autorelease pools cover chunk reads, file parsing and aggregation so background
+  actors do not retain Foundation temporaries until the full scan returns.
 - Claude and Codex single-source weekly totals now use calendar days, not the
   last seven days with activity.
 
@@ -42,6 +44,7 @@ profile totals may include other devices or use a different counting method.
 Quota fetching, activity-based polling, authentication and preferences are
 unchanged. On a pricing-key change, the normal loading state remains visible
 until the first complete scan; later starts restore the small usage snapshot.
+The menu-bar placeholder is `Loading`.
 
 ## Validation
 
@@ -57,7 +60,14 @@ scan in about 1.2 seconds. These are measurements on one machine, not guarantees
 for every history size or device. Packaging and Swift compiler memory are not
 included in claims about scanner memory usage.
 
-The broader regression run passed 128 tests and skipped two opt-in tests after
+The installed menu-bar application was also checked through a complete cold
+rebuild. This exposed worker-actor autorelease accumulation not reproduced by
+the synchronous XCTest scan; the chunk/file/scan pools above address it.
+Post-fix spot checks stayed below 650 MiB RSS during scanning and dropped after
+completion, rather than growing by gigabytes. This is an observed sample, not
+a fixed memory ceiling for arbitrary rollout lines or history sizes.
+
+The broader regression run passed 129 tests and skipped two opt-in tests after
 excluding the pre-existing interactive submenu test
 `testRepeatedControlClicksDoNotEndTrackedSubmenu`. A full run still reproduced
 that test's two assertions previously documented in the November 6 release;

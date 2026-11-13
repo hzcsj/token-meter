@@ -3,6 +3,14 @@ import XCTest
 @testable import TokenMeter
 
 final class StartupUsageTests: XCTestCase {
+    @MainActor
+    func testStatusBarLoadingUsesEnglishPlaceholder() {
+        XCTAssertEqual(TitleRenderer.loadingText, "Loading")
+        let image = TitleRenderer().renderLoading()
+        XCTAssertTrue(image.isTemplate)
+        XCTAssertGreaterThan(image.size.width, 0)
+    }
+
     private func temporaryDirectory() throws -> URL {
         let directory = FileManager.default.temporaryDirectory
             .appendingPathComponent("TokenMeterStartupTests-\(UUID().uuidString)", isDirectory: true)

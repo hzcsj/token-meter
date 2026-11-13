@@ -37,10 +37,14 @@ private actor LocalUsageScanner {
     private lazy var openCode = OpenCodeUsageScanner()
 
     func scan() -> LocalUsageSnapshot {
-        let claudeUsage = claude.scan()
-        let (codexUsage, quota) = codex.scan()
-        return LocalUsageSnapshot(claude: claudeUsage, codex: codexUsage,
-                                  openCode: openCode.scan(), codexQuota: quota)
+        // Worker actors do not have the main run loop's frequent autorelease drain.
+        // Chunk/file pools bound cold-scan memory; this pool also drains aggregation.
+        autoreleasepool {
+            let claudeUsage = claude.scan()
+            let (codexUsage, quota) = codex.scan()
+            return LocalUsageSnapshot(claude: claudeUsage, codex: codexUsage,
+                                      openCode: openCode.scan(), codexQuota: quota)
+        }
     }
 }
 

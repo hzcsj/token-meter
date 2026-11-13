@@ -69,8 +69,12 @@ final class LocalUsageService {
         isRefreshing = true
         let updated = await scan()
         // Keep the previous complete snapshot visible until all sources finish.
-        snapshot = updated
-        store.save(updated)
+        // A failed Codex source scan must not erase its last complete summary.
+        let retained = LocalUsageSnapshot(claude: updated.claude,
+            codex: updated.codex ?? snapshot?.codex, openCode: updated.openCode,
+            codexQuota: updated.codexQuota ?? snapshot?.codexQuota)
+        snapshot = retained
+        store.save(retained)
         lastRefreshAt = Date()
         isRefreshing = false
         return true

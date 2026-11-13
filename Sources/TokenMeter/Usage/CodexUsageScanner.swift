@@ -46,11 +46,13 @@ func resolveCodexQuota(
 
 struct CodexUsageScanner {
     private let codexDir: URL
-    private let cache = IncrementalCache<CodexFileScanResult>(name: "codex_usage_v6_\(PricingEngine.shared.cacheKey)")
+    private let cache: IncrementalCache<CodexFileScanResult>
 
-    init() {
+    init(codexDir: URL? = nil, cacheDirectory: URL? = nil) {
         let home = FileManager.default.homeDirectoryForCurrentUser
-        self.codexDir = home.appendingPathComponent(".codex", isDirectory: true)
+        self.codexDir = codexDir ?? home.appendingPathComponent(".codex", isDirectory: true)
+        self.cache = IncrementalCache(name: "codex_usage_v7_\(PricingEngine.shared.cacheKey)",
+                                      directory: cacheDirectory)
     }
 
     func scan() -> (summary: UsageSummary?, quota: CodexQuota?) {
@@ -69,77 +71,70 @@ struct CodexUsageScanner {
         var latestUntrustedQuota: CodexQuotaSnapshot?
         var latestNonzeroPrimaryQuota: CodexQuotaSnapshot?
 
+        // A rollout can briefly exist in both formats/locations during archival.
+        // Group by logical filename, prefer the live plain file, and count once.
+        var candidates: [String: [URL]] = [:]
+        var complete = true
         for dir in [sessionsDir, archivedDir] {
             guard FileManager.default.fileExists(atPath: dir.path) else { continue }
-
             guard let enumerator = FileManager.default.enumerator(
-                at: dir,
-                includingPropertiesForKeys: [.contentModificationDateKey, .fileSizeKey],
-                options: [.skipsHiddenFiles]
-            ) else { continue }
-
+                at: dir, includingPropertiesForKeys: [.contentModificationDateKey, .fileSizeKey],
+                options: [.skipsHiddenFiles], errorHandler: { _, _ in complete = false; return true }
+            ) else { complete = false; continue }
             while let url = enumerator.nextObject() as? URL {
-                guard url.pathExtension == "jsonl" else { continue }
-
+                guard url.pathExtension == "jsonl" || url.lastPathComponent.hasSuffix(".jsonl.zst") else { continue }
+                let name = url.pathExtension == "zst"
+                    ? url.deletingPathExtension().lastPathComponent : url.lastPathComponent
+                candidates[name, default: []].append(url)
                 validPaths.insert(url.path)
-
-                if !cache.needsRescan(url) {
-                    if let cached = cache.get(url) {
-                        allRecords.append(contentsOf: cached.records)
-
-                        if let tid = cached.threadId {
-                            jsonlThreadIds.insert(tid)
-                        }
-
-                        if let trusted = cached.latestTrustedQuota {
-                            if latestTrustedQuota == nil || trusted.timestamp > latestTrustedQuota!.timestamp {
-                                latestTrustedQuota = trusted
-                            }
-                        }
-                        if let untrusted = cached.latestUntrustedQuota {
-                            if latestUntrustedQuota == nil || untrusted.timestamp > latestUntrustedQuota!.timestamp {
-                                latestUntrustedQuota = untrusted
-                            }
-                        }
-                        if let nonzero = cached.latestNonzeroPrimaryQuota {
-                            if latestNonzeroPrimaryQuota == nil || nonzero.timestamp > latestNonzeroPrimaryQuota!.timestamp {
-                                latestNonzeroPrimaryQuota = nonzero
-                            }
-                        }
-                    }
-                    continue
-                }
-
-                guard let signature = FileSignature(url: url) else { continue }
-                let scanResult = parseJSONL(url)
-
-                cache.set(url, signature: signature, data: scanResult)
-                allRecords.append(contentsOf: scanResult.records)
-
-                if let tid = scanResult.threadId {
-                    jsonlThreadIds.insert(tid)
-                }
-
-                if let trusted = scanResult.latestTrustedQuota {
-                    if latestTrustedQuota == nil || trusted.timestamp > latestTrustedQuota!.timestamp {
-                        latestTrustedQuota = trusted
-                    }
-                }
-                if let untrusted = scanResult.latestUntrustedQuota {
-                    if latestUntrustedQuota == nil || untrusted.timestamp > latestUntrustedQuota!.timestamp {
-                        latestUntrustedQuota = untrusted
-                    }
-                }
-                if let nonzero = scanResult.latestNonzeroPrimaryQuota {
-                    if latestNonzeroPrimaryQuota == nil || nonzero.timestamp > latestNonzeroPrimaryQuota!.timestamp {
-                        latestNonzeroPrimaryQuota = nonzero
-                    }
-                }
             }
         }
 
-        cache.cleanup(validPaths: validPaths)
+        for name in candidates.keys.sorted() {
+            let urls = candidates[name]!.sorted {
+                if ($0.pathExtension == "jsonl") != ($1.pathExtension == "jsonl") {
+                    return $0.pathExtension == "jsonl"
+                }
+                return $0.path < $1.path
+            }
+            var selected: CodexFileScanResult?
+            for url in urls {
+                if !cache.needsRescan(url), let cached = cache.get(url) {
+                    selected = cached
+                    break
+                }
+                guard let signature = FileSignature(url: url),
+                      let result = try? parseJSONL(url) else { continue }
+                // Never mark a partially written or concurrently replaced file as cached.
+                if FileSignature(url: url) == signature {
+                    cache.set(url, signature: signature, data: result)
+                }
+                selected = result
+                break
+            }
+            // A damaged/truncated archive must not replace good data with an empty entry.
+            if selected == nil { selected = urls.compactMap { cache.get($0) }.first }
+            guard let result = selected else { complete = false; continue }
+            allRecords.append(contentsOf: result.records)
+            if let tid = result.threadId { jsonlThreadIds.insert(tid) }
+            if let quota = result.latestTrustedQuota,
+               latestTrustedQuota == nil || quota.timestamp > latestTrustedQuota!.timestamp {
+                latestTrustedQuota = quota
+            }
+            if let quota = result.latestUntrustedQuota,
+               latestUntrustedQuota == nil || quota.timestamp > latestUntrustedQuota!.timestamp {
+                latestUntrustedQuota = quota
+            }
+            if let quota = result.latestNonzeroPrimaryQuota,
+               latestNonzeroPrimaryQuota == nil || quota.timestamp > latestNonzeroPrimaryQuota!.timestamp {
+                latestNonzeroPrimaryQuota = quota
+            }
+        }
+
+        if complete { cache.cleanup(validPaths: validPaths) }
         cache.save()
+        // Keep the previous UI snapshot if a source cannot be read. Retry next scan.
+        guard complete else { return (nil, nil) }
 
         // Supplement with logs-only side/temporary chat records
         let logsOnlyRecords = scanLogsOnlyRecords(knownJSONLThreadIds: jsonlThreadIds, jsonlRecords: allRecords)
@@ -157,10 +152,7 @@ struct CodexUsageScanner {
 
     // MARK: - Private
 
-    private func parseJSONL(_ url: URL) -> CodexFileScanResult {
-        guard let data = try? String(contentsOf: url, encoding: .utf8) else {
-            return CodexFileScanResult(records: [], latestTrustedQuota: nil, latestUntrustedQuota: nil, latestNonzeroPrimaryQuota: nil, threadId: nil)
-        }
+    func parseJSONL(_ url: URL) throws -> CodexFileScanResult {
 
         var records: [UsageRecord] = []
         var latestTrustedQuota: CodexQuotaSnapshot?
@@ -174,18 +166,18 @@ struct CodexUsageScanner {
 
         var currentModel = defaultModel
         var currentServiceTier = defaultServiceTier
+        let fractionalDate = ISO8601DateFormatter()
+        fractionalDate.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        let wholeDate = ISO8601DateFormatter()
+        wholeDate.formatOptions = [.withInternetDateTime]
 
-        let lines = data.components(separatedBy: .newlines)
-
-        for line in lines {
-            guard !line.isEmpty,
-                  let jsonData = line.data(using: .utf8) else {
-                continue
-            }
+        let relevant = ["\"token_count\"", "\"session_meta\"", "\"turn_context\""].map { Data($0.utf8) }
+        try JSONLStreamReader().read(url) { jsonData in
+            guard relevant.contains(where: { jsonData.range(of: $0) != nil }) else { return }
 
             do {
                 let json = try JSONSerialization.jsonObject(with: jsonData) as? [String: Any]
-                guard let json = json else { continue }
+                guard let json = json else { return }
 
                 let type = json["type"] as? String
 
@@ -193,7 +185,7 @@ struct CodexUsageScanner {
                    let payload = json["payload"] as? [String: Any],
                    let tid = payload["id"] as? String, !tid.isEmpty {
                     threadId = tid
-                    continue
+                    return
                 }
 
                 if type == "turn_context",
@@ -204,7 +196,7 @@ struct CodexUsageScanner {
                     if let tier = payload["service_tier"] as? String {
                         currentServiceTier = tier
                     }
-                    continue
+                    return
                 }
 
                 if type == "event_msg",
@@ -214,8 +206,8 @@ struct CodexUsageScanner {
                    let lastUsage = info["last_token_usage"] as? [String: Any] {
 
                     guard let timestampStr = json["timestamp"] as? String,
-                          let timestamp = parseISO8601(timestampStr) else {
-                        continue
+                          let timestamp = fractionalDate.date(from: timestampStr) ?? wholeDate.date(from: timestampStr) else {
+                        return
                     }
 
                     let input = lastUsage["input_tokens"] as? Int ?? 0
@@ -279,7 +271,7 @@ struct CodexUsageScanner {
                                 resetsAt: Date(timeIntervalSince1970: resetsAt)
                             ))
                         }
-                        guard validWindows else { continue }
+                        guard validWindows else { return }
                         windows.sort { $0.windowMinutes < $1.windowMinutes }
 
                         let snapshot = CodexQuotaSnapshot(
@@ -309,7 +301,7 @@ struct CodexUsageScanner {
                     }
                 }
             } catch {
-                continue
+                return
             }
         }
 
@@ -357,7 +349,9 @@ struct CodexUsageScanner {
         let now = Date()
         let monthStart = calendar.date(from: calendar.dateComponents([.year, .month], from: now))!
 
-        let weekDays = Array(dailyUsages.prefix(7))
+        let weekStart = calendar.date(byAdding: .day, value: -6, to: calendar.startOfDay(for: now))!
+        let weekStartKey = formatter.string(from: weekStart)
+        let weekDays = dailyUsages.filter { $0.date >= weekStartKey }
         let weekTotal = DailyUsage(
             date: "week",
             tokens: weekDays.reduce(0) { $0 + $1.tokens },
@@ -406,18 +400,6 @@ struct CodexUsageScanner {
         }
 
         return nil
-    }
-
-    private func parseISO8601(_ str: String) -> Date? {
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-
-        if let date = formatter.date(from: str) {
-            return date
-        }
-
-        formatter.formatOptions = [.withInternetDateTime]
-        return formatter.date(from: str)
     }
 
     // MARK: - Logs-only supplemental scan

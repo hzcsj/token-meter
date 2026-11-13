@@ -27,10 +27,11 @@ struct CacheEntry<T: Codable>: Codable {
 final class IncrementalCache<T: Codable> {
     private let cacheFile: URL
     private var cache: [String: CacheEntry<T>] = [:]
+    private var dirty = false
 
-    init(name: String) {
+    init(name: String, directory: URL? = nil) {
         let cacheBase = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first!
-        let cacheDir = cacheBase.appendingPathComponent("token-meter", isDirectory: true)
+        let cacheDir = directory ?? cacheBase.appendingPathComponent("token-meter", isDirectory: true)
         self.cacheFile = cacheDir.appendingPathComponent("\(name).json")
         load()
     }
@@ -53,13 +54,18 @@ final class IncrementalCache<T: Codable> {
 
     func set(_ url: URL, signature: FileSignature, data: T) {
         cache[url.path] = CacheEntry(signature: signature, data: data)
+        dirty = true
     }
 
     func cleanup(validPaths: Set<String>) {
-        cache = cache.filter { validPaths.contains($0.key) }
+        let obsolete = cache.keys.filter { !validPaths.contains($0) }
+        guard !obsolete.isEmpty else { return }
+        for key in obsolete { cache.removeValue(forKey: key) }
+        dirty = true
     }
 
     func save() {
+        guard dirty else { return }
         let cacheDir = cacheFile.deletingLastPathComponent()
         try? FileManager.default.createDirectory(at: cacheDir, withIntermediateDirectories: true)
 
@@ -67,7 +73,10 @@ final class IncrementalCache<T: Codable> {
         encoder.dateEncodingStrategy = .secondsSince1970
 
         if let data = try? encoder.encode(cache) {
-            try? data.write(to: cacheFile, options: .atomic)
+            do {
+                try data.write(to: cacheFile, options: .atomic)
+                dirty = false
+            } catch { /* Retry on the next scan; keep the last on-disk cache. */ }
         }
     }
 

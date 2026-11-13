@@ -123,6 +123,22 @@ final class StartupUsageTests: XCTestCase {
     }
 
     @MainActor
+    func testFailedCodexScanRetainsPreviousUsageWithoutRestoringLogin() async throws {
+        let directory = try temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let store = UsageSnapshotStore(directory: directory, pricingKey: "current")
+        let previous = snapshot()
+        store.save(previous)
+        let service = LocalUsageService(store: store, scan: {
+            LocalUsageSnapshot(claude: nil, codex: nil, openCode: nil, codexQuota: nil)
+        })
+        _ = await service.refresh(force: true)
+        XCTAssertEqual(service.snapshot?.codex, previous.codex)
+        XCTAssertEqual(store.load()?.codex, previous.codex)
+        XCTAssertNil(displayedCodexQuota(live: .noSubscription, local: service.snapshot?.codexQuota))
+    }
+
+    @MainActor
     func testEmptyCompletedScanIsNotPerpetuallyLoading() async throws {
         let directory = try temporaryDirectory()
         defer { try? FileManager.default.removeItem(at: directory) }

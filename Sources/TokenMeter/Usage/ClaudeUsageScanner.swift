@@ -172,7 +172,9 @@ struct ClaudeUsageScanner {
         let now = Date()
         let monthStart = calendar.date(from: calendar.dateComponents([.year, .month], from: now))!
 
-        let weekDays = Array(dailyUsages.prefix(7))
+        let weekStart = calendar.date(byAdding: .day, value: -6, to: calendar.startOfDay(for: now))!
+        let weekStartKey = formatter.string(from: weekStart)
+        let weekDays = dailyUsages.filter { $0.date >= weekStartKey }
         let weekTotal = DailyUsage(
             date: "week",
             tokens: weekDays.reduce(0) { $0 + $1.tokens },

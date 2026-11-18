@@ -64,7 +64,7 @@ To create a release bundle without installing anything or changing `launchctl` s
 bash scripts/package.sh --arch universal --output-dir dist
 ```
 
-This produces `dist/TokenMeter.app` and `dist/TokenMeter-v0.2.12-macos-universal.zip` without writing to `/Applications`.
+This produces `dist/TokenMeter.app` and `dist/TokenMeter-v0.2.13-macos-universal.zip` without writing to `/Applications`.
 
 ## Signing, notarization, and Gatekeeper
 
@@ -145,6 +145,8 @@ When updating an existing price, append a dated revision containing the **comple
 Version 0.2.12 reads both plain `.jsonl` and compressed `.jsonl.zst` Codex rollouts in active and archived session directories. Streaming decompression is built into the app; no external tools or extracted files are required. Unchanged rollouts use the incremental cache, and unchanged caches are not rewritten. Historical totals still reflect local source files, not a separate permanent ledger. See the [archive compatibility notes](docs/codex-archive-recovery.md).
 
 The November 13 catalog adds Fable/Mythos 5.2, Gemini 4 Carbon and Hydrogen, plus dated Gemini 2.5 Pro migration rates. Existing historical prices are preserved. See the [November 13 pricing audit](docs/pricing-2026-11-13.md).
+
+The November 18 catalog (0.2.13) adds GPT-6.2 Astra/Sol to general and Codex mappings, including long-context prices and the dated Ultrafast promotion. It also adds Qwen4 Max and updates Qwen3.7 Plus pricing while preserving earlier estimates. See the [November 18 pricing audit](docs/pricing-2026-11-18.md) for official sources, Pacific-time boundaries and scope.
 
 ## Development
 

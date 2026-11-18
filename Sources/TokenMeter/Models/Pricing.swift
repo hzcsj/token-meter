@@ -231,8 +231,8 @@ extension Pricing {
             .filter { model.isPricingVariant(of: $0) }
             .max(by: { $0.count < $1.count }) ?? codexFallbackModel
 
-        if let timestamp,
-           let history = priceHistory?.filter({
+        let timestamp = timestamp ?? Date()
+        if let history = priceHistory?.filter({
                timestamp < $0.effectiveUntil && $0.codexModelsUSD?[key] != nil
            }).min(by: { $0.effectiveUntil < $1.effectiveUntil }),
            let price = history.codexModelsUSD?[key] {

@@ -189,6 +189,19 @@ final class PricingScheduleTests: XCTestCase {
         XCTAssertEqual(pricing.findModelPrice("deepseek-reasoner").input, 0.14)
     }
 
+    func testDeepSeek2027HolidaysDoNotDiscountAdjacentWeekdays() throws {
+        let pricing = try catalog()
+        for model in ["deepseek-flash", "deepseek-v4-flash", "deepseek-v4-pro"] {
+            let price = pricing.findModelPrice(model)
+            for day in ["01-01", "02-05", "02-12", "04-05", "05-05", "06-09", "09-15", "10-07"] {
+                XCTAssertEqual(pricing.timeMultiplier(for: price, at: date("2027-" + day + "T02:00:00Z")), 0.5, day)
+            }
+            for day in ["01-04", "02-15", "05-06", "10-08"] {
+                XCTAssertEqual(pricing.timeMultiplier(for: price, at: date("2027-" + day + "T02:00:00Z")), 1, day)
+            }
+        }
+    }
+
     func testSchedulesApplyToAllTokenPartitionsAndSurviveReload() throws {
         let pricing = try catalog()
         let restored = try JSONDecoder().decode(Pricing.self, from: JSONEncoder().encode(pricing))

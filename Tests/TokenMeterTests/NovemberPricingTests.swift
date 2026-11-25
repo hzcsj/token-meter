@@ -44,6 +44,24 @@ final class NovemberPricingTests: XCTestCase {
         XCTAssertEqual(hydrogen.cacheRead, 0.075)
     }
 
+    func testNeonStandardRatesDoNotInheritCarbonPromotion() throws {
+        let pricing = try catalog()
+        for model in ["gemini-4-neon", "gemini-4-neon[1m]"] {
+            for instant in ["2026-11-18T12:00:00Z", "2026-12-01T00:00:00Z"] {
+                let price = pricing.findModelPrice(model, at: date(instant))
+                XCTAssertFalse(price.isCNY)
+                XCTAssertEqual(price.input, 3)
+                XCTAssertEqual(price.output, 15)
+                XCTAssertEqual(price.cacheRead, 0.15)
+                XCTAssertEqual(price.effectiveRates(inputTokens: 1_000_000).input, 3)
+                let usage = UsageRecord.TokenUsage(input: 100_000, output: 10_000,
+                    cacheWrite5m: 0, cacheWrite1h: 0, cacheRead: 100_000)
+                XCTAssertEqual(PricingEngine.shared.calculateCNY(usage: usage, model: model,
+                    at: date(instant)), 3.255, accuracy: 0.000001)
+            }
+        }
+    }
+
     func testGemini25ProMigrationPreservesCompleteHistoricalEntry() throws {
         let pricing = try catalog()
         let old = pricing.findModelPrice("gemini-2.5-pro", at: date("2026-11-30T23:59:59Z"))

@@ -8,7 +8,7 @@
     "qwen_pricing_source": "https://help.aliyun.com/zh/model-studio/model-pricing",
     "glm_pricing_source": "https://docs.bigmodel.cn/cn/guide/start/pricing",
     "deepseek_pricing_source": "https://api-docs.deepseek.com/quick_start/pricing",
-    "last_updated": "2026-11-18",
+    "last_updated": "2026-11-25",
     "note": "Official on-demand API rates, including the publicly advertised GPT-5.6 Sol promotion (until 2026-11-30); post-promotion rates require re-verification, so no automatic reversion is inferred. Sonnet 5 remains $2/$10. Batch/Flex, regional uplifts, and time-based cache storage are excluded. USD uses configured 7.0 CNY conversion. Fast/priority use API rates from 2026-07-30; earlier estimates are preserved in price_history.",
     "openai_changelog_source": "https://developers.openai.com/api/docs/changelog",
     "openai_fast_source": "https://developers.openai.com/api/docs/guides/fast-mode",
@@ -17,15 +17,15 @@
     "gpt_61_terra_source": "https://developers.openai.com/api/docs/models/gpt-6.1-terra",
     "claude_changelog_source": "https://platform.claude.com/docs/en/release-notes/overview",
     "qwen_cache_source": "https://bailian.console.aliyun.com/",
-    "pricing_audit": "docs/pricing-2026-11-18.md",
+    "pricing_audit": "docs/pricing-2026-11-25.md",
     "qwen_cache_last_verified": "2026-09-29",
     "provider_last_verified": {
-      "openai": "2026-11-18",
-      "anthropic": "2026-11-18",
-      "google": "2026-11-18",
-      "qwen": "2026-11-18",
-      "glm": "2026-11-18",
-      "deepseek": "2026-11-18"
+      "openai": "2026-11-25",
+      "anthropic": "2026-11-25",
+      "google": "2026-11-25",
+      "qwen": "2026-11-25",
+      "glm": "2026-11-25",
+      "deepseek": "2026-11-25"
     },
     "history_note": "price_history preserves prior catalog rates for records strictly before each effective_until (exclusive). Official changelog dates: Terra/Luna and Fast on 2026-07-30; Sol on 2026-08-21; Astra Ultrafast on 2026-09-29; Sonnet 5.5 cache-read reduction on 2026-10-07; GPT-6.1 Sol Ultrafast and Gemini 3.5 Flash routing to 3.6 on 2026-10-08. Sources give dates, not exact instants; boundaries use 00:00 UTC. No verified history is available before the previous catalog; its rates remain the baseline. New model IDs use their own prices even for historical records, correcting former fallback estimates. GPT-6.2 Ultrafast changes at 2027-03-01T08:00:00Z (Pacific midnight). Qwen3.7 Plus uses the 2026-11-18 catalog-adoption boundary; no official promotion start date is inferred.",
     "gpt_62_astra_source": "https://developers.openai.com/api/docs/models/gpt-6.2-astra",
@@ -94,6 +94,13 @@
       "cache_write_5m": 10,
       "cache_write_1h": 16,
       "cache_read": 0.2
+    },
+    "gemini-4-neon": {
+      "input": 3,
+      "output": 15,
+      "cache_write_5m": 3,
+      "cache_write_1h": 3,
+      "cache_read": 0.15
     },
     "gemini-4-carbon": {
       "input": 4,
@@ -893,7 +900,15 @@
         "2026-06-19", "2026-06-20", "2026-06-21",
         "2026-09-25", "2026-09-26", "2026-09-27",
         "2026-10-01", "2026-10-02", "2026-10-03", "2026-10-04",
-        "2026-10-05", "2026-10-06", "2026-10-07"
+        "2026-10-05", "2026-10-06", "2026-10-07",
+        "2027-01-01", "2027-01-02", "2027-01-03",
+        "2027-02-05", "2027-02-06", "2027-02-07", "2027-02-08", "2027-02-09",
+        "2027-02-10", "2027-02-11", "2027-02-12", "2027-02-13",
+        "2027-04-03", "2027-04-04", "2027-04-05",
+        "2027-05-01", "2027-05-02", "2027-05-03", "2027-05-04", "2027-05-05",
+        "2027-06-09", "2027-09-15",
+        "2027-10-01", "2027-10-02", "2027-10-03", "2027-10-04",
+        "2027-10-05", "2027-10-06", "2027-10-07"
       ]
     }
   },

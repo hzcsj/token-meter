@@ -64,7 +64,7 @@ To create a release bundle without installing anything or changing `launchctl` s
 bash scripts/package.sh --arch universal --output-dir dist
 ```
 
-This produces `dist/TokenMeter.app` and `dist/TokenMeter-v0.2.13-macos-universal.zip` without writing to `/Applications`.
+This produces `dist/TokenMeter.app` and `dist/TokenMeter-v0.2.14-macos-universal.zip` without writing to `/Applications`.
 
 ## Signing, notarization, and Gatekeeper
 
@@ -138,7 +138,7 @@ The November 6, 2026 catalog adds GPT-6.1 Terra to both general and Codex mappin
 - From July 30, GPT-5.6 `fast` and `priority` both use 2× API rates. Earlier catalog estimates are retained.
 - Official announcements specify dates without an exact time; cutoffs use 00:00 UTC (08:00 Asia/Shanghai).
 - Gemini 3.6 retains earlier estimates before the September 29 catalog adoption date; Flash introductory pricing expires on January 1, 2027. Exact official DeepSeek change instants override the date-only convention.
-- `time_schedules` applies DeepSeek weekday peak hours, off-peak multipliers and the 2026 Chinese holiday calendar in provider timezones, never the local computer timezone. Future holiday calendars require a catalog update.
+- `time_schedules` applies DeepSeek weekday peak hours, off-peak multipliers and the 2026–2027 Chinese holiday calendar in provider timezones, never the local computer timezone. Later years require a catalog update.
 
 When updating an existing price, append a dated revision containing the **complete previous rate entry** before editing the current table; never overwrite earlier revisions. The catalog fingerprint automatically invalidates cost caches. A rebuild uses event-time prices, not today's prices for all records. Existing cache files are left intact. Earlier unverified price history retains the previous catalog baseline; correcting a missing model or a counting bug can still change past estimates. These are virtual API-equivalent costs, not subscription bills. Provider-specific verification dates are recorded in `_meta.provider_last_verified`.
 
@@ -147,6 +147,8 @@ Version 0.2.12 reads both plain `.jsonl` and compressed `.jsonl.zst` Codex rollo
 The November 13 catalog adds Fable/Mythos 5.2, Gemini 4 Carbon and Hydrogen, plus dated Gemini 2.5 Pro migration rates. Existing historical prices are preserved. See the [November 13 pricing audit](docs/pricing-2026-11-13.md).
 
 The November 18 catalog (0.2.13) adds GPT-6.2 Astra/Sol to general and Codex mappings, including long-context prices and the dated Ultrafast promotion. It also adds Qwen4 Max and updates Qwen3.7 Plus pricing while preserving earlier estimates. See the [November 18 pricing audit](docs/pricing-2026-11-18.md) for official sources, Pacific-time boundaries and scope.
+
+The [November 25 pricing audit](docs/pricing-2026-11-25.md) adds Gemini 4 Neon and extends DeepSeek holiday pricing through 2027. Subscription quota is independent of these API-equivalent estimates.
 
 ## Development
 
